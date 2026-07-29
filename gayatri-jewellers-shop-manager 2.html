@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Gayatri Jewellers — Shop Manager</title>
+<!-- iPad / iPhone home-screen app support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gayatri Jewellers">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#450D17">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="icon" href="data:image/png;base64,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">
+<style>
+:root{
+  --maroon:#6E1423;
+  --maroon-dark:#450D17;
+  --maroon-light:#8C2233;
+  --gold:#AD8A3B;
+  --gold-light:#E4D4A7;
+  --gold-pale:#F3EAD1;
+  --bg:#F2ECDD;
+  --paper:#FFFFFF;
+  --ink:#2B2320;
+  --ink-soft:#6B5F55;
+  --line:#E2D8C2;
+  --silver-accent:#7C8794;
+  --success:#2F7A4F;
+  --success-bg:#E4F0E7;
+  --danger:#AD3B32;
+  --danger-bg:#F5E4E1;
+  --warn-bg:#FBEFD9;
+  --radius:10px;
+  --shadow:0 2px 10px rgba(69,13,23,0.08);
+  --font-display:Georgia,'Times New Roman',serif;
+  --font-body:'Segoe UI',Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-tap-highlight-color:transparent;
+  overflow:hidden;
+}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-thumb{background:var(--gold-light);border-radius:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+
+/* ---------- LOCK SCREEN ---------- */
+#lockScreen{
+  position:fixed;inset:0;background:linear-gradient(160deg,var(--maroon-dark),var(--maroon) 60%,#5A1420);
+  display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;
+}
+.seal{
+  width:92px;height:92px;border-radius:50%;border:3px solid var(--gold-light);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);
+  font-size:30px;color:var(--gold-light);letter-spacing:1px;margin-bottom:18px;
+  box-shadow:0 0 0 4px rgba(228,212,167,0.15);
+}
+.lockCard{
+  background:rgba(255,255,255,0.06);border:1px solid rgba(228,212,167,0.35);
+  border-radius:16px;padding:36px 40px;text-align:center;min-width:340px;
+  backdrop-filter:blur(2px);
+}
+.lockCard h1{font-family:var(--font-display);color:#fff;font-size:26px;margin:0 0 2px;letter-spacing:.5px;}
+.lockCard p.sub{color:var(--gold-light);margin:0 0 22px;font-size:13px;letter-spacing:2px;text-transform:uppercase;}
+.pinDots{display:flex;gap:12px;justify-content:center;margin:18px 0;}
+.pinDot{width:16px;height:16px;border-radius:50%;border:2px solid var(--gold-light);background:transparent;transition:.15s;}
+.pinDot.filled{background:var(--gold-light);}
+.padGrid{display:grid;grid-template-columns:repeat(3,64px);gap:12px;justify-content:center;margin-top:10px;}
+.padBtn{width:64px;height:64px;border-radius:50%;border:1px solid rgba(228,212,167,0.5);background:rgba(255,255,255,0.05);color:#fff;font-size:22px;}
+.padBtn:active{background:var(--gold);color:var(--maroon-dark);}
+.padBtn.wide{grid-column:span 1;font-size:14px;}
+#lockError{color:#FFC9C0;font-size:13px;height:18px;margin-top:8px;}
+#lockHint{color:rgba(255,255,255,.55);font-size:12px;margin-top:14px;}
+
+/* ---------- SHELL ---------- */
+#shell{display:none;height:100vh;width:100vw;grid-template-columns:230px 1fr;}
+#shell.active{display:grid;}
+#sidebar{
+  background:var(--maroon-dark);color:#fff;display:flex;flex-direction:column;
+  padding:18px 0;overflow-y:auto;
+}
+.brand{padding:0 18px 16px;border-bottom:1px solid rgba(228,212,167,0.2);margin-bottom:10px;display:flex;gap:10px;align-items:center;}
+.brand .mark{width:38px;height:38px;border-radius:50%;border:2px solid var(--gold-light);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);color:var(--gold-light);font-size:15px;flex-shrink:0;}
+.brand .txt h2{font-family:var(--font-display);font-size:15px;margin:0;line-height:1.2;color:#fff;}
+.brand .txt span{font-size:10px;color:var(--gold-light);letter-spacing:1px;}
+nav.navlist{flex:1;padding:6px 10px;}
+.navitem{
+  display:flex;align-items:center;gap:10px;padding:12px 12px;border-radius:8px;color:rgba(255,255,255,.82);
+  font-size:14px;margin-bottom:3px;cursor:pointer;border:1px solid transparent;
+}
+.navitem .num{font-family:var(--font-display);font-size:12px;color:var(--gold-light);width:18px;flex-shrink:0;}
+.navitem:hover{background:rgba(255,255,255,0.06);}
+.navitem.active{background:var(--gold);color:var(--maroon-dark);font-weight:600;}
+.navitem.active .num{color:var(--maroon-dark);}
+.navGroupLabel{font-size:10px;letter-spacing:1.5px;color:rgba(255,255,255,.4);padding:14px 12px 4px;text-transform:uppercase;}
+.sideFooter{padding:12px 16px;border-top:1px solid rgba(228,212,167,0.2);}
+.sideFooter button{width:100%;background:transparent;border:1px solid rgba(228,212,167,0.4);color:var(--gold-light);padding:9px;border-radius:8px;font-size:12px;margin-bottom:6px;}
+.langToggle{display:flex;border:1px solid rgba(228,212,167,0.4);border-radius:8px;overflow:hidden;margin-bottom:8px;}
+.langToggle div{flex:1;text-align:center;padding:6px 0;font-size:12px;color:rgba(255,255,255,.7);}
+.langToggle div.active{background:var(--gold);color:var(--maroon-dark);font-weight:600;}
+
+#main{overflow-y:auto;display:flex;flex-direction:column;}
+#topbar{
+  background:var(--paper);border-bottom:1px solid var(--line);padding:14px 26px;
+  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;
+}
+#topbar h1{font-family:var(--font-display);font-size:21px;margin:0;color:var(--maroon-dark);}
+.topClockSub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;letter-spacing:.3px;}
+.rateStrip{display:flex;gap:18px;}
+.ratePill{background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:20px;padding:6px 14px;font-size:12.5px;color:var(--maroon-dark);display:flex;gap:6px;align-items:center;}
+.ratePill b{font-family:var(--font-display);font-size:14px;}
+#content{padding:22px 26px 60px;flex:1;}
+
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.cardHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.cardHead h3{font-family:var(--font-display);margin:0;font-size:17px;color:var(--maroon-dark);}
+.eyebrow{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 4px;}
+
+.btn{border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--maroon);color:#fff;}
+.btn-primary:active{background:var(--maroon-dark);}
+.btn-gold{background:var(--gold);color:var(--maroon-dark);}
+.btn-outline{background:transparent;border:1.5px solid var(--maroon);color:var(--maroon);}
+.btn-ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line);}
+.btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger);}
+.btn-sm{padding:7px 12px;font-size:12.5px;border-radius:7px;}
+.btn:disabled{opacity:.5;}
+
+.grid{display:grid;gap:14px;}
+.grid-2{grid-template-columns:1fr 1fr;}
+.grid-3{grid-template-columns:1fr 1fr 1fr;}
+.grid-4{grid-template-columns:1fr 1fr 1fr 1fr;}
+@media(max-width:900px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr 1fr;}}
+
+.field label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:5px;font-weight:600;}
+.field input,.field select,.field textarea{
+  width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;background:#fff;color:var(--ink);
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--gold);}
+.field{margin-bottom:0;}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{text-align:left;padding:10px 10px;background:var(--gold-pale);color:var(--maroon-dark);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gold-light);}
+td{padding:10px 10px;border-bottom:1px solid var(--line);}
+tr:hover td{background:#FBF8F1;}
+.tag{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;}
+.tag-green{background:var(--success-bg);color:var(--success);}
+.tag-red{background:var(--danger-bg);color:var(--danger);}
+.tag-gold{background:var(--warn-bg);color:#8A6416;}
+.tag-gray{background:#EDEAE2;color:var(--ink-soft);}
+
+.statGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+@media(max-width:1100px){.statGrid{grid-template-columns:repeat(2,1fr);}}
+.statCard{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--gold);}
+.statCard .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);}
+.statCard .val{font-family:var(--font-display);font-size:26px;color:var(--maroon-dark);margin-top:4px;}
+.statCard .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+.empty{text-align:center;padding:40px 20px;color:var(--ink-soft);}
+.empty .big{font-size:34px;margin-bottom:8px;}
+
+.modalWrap{position:fixed;inset:0;background:rgba(43,35,32,0.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;}
+.modalWrap.active{display:flex;}
+.modal{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.modalHead{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--gold-pale);border-radius:14px 14px 0 0;}
+.modalHead h3{margin:0;font-family:var(--font-display);color:var(--maroon-dark);}
+.modalClose{background:transparent;border:none;font-size:22px;color:var(--maroon-dark);}
+.modalBody{padding:20px 22px;}
+.modalFoot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--maroon-dark);color:#fff;padding:13px 22px;border-radius:10px;font-size:14px;z-index:400;box-shadow:0 8px 24px rgba(0,0,0,0.3);display:none;}
+.toast.show{display:block;}
+
+.pillTabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.pillTab{padding:8px 16px;border-radius:20px;border:1.5px solid var(--line);background:#fff;font-size:13px;color:var(--ink-soft);font-weight:600;}
+.pillTab.active{background:var(--maroon);color:#fff;border-color:var(--maroon);}
+
+.itemRow{display:grid;grid-template-columns:1.3fr 0.9fr 0.9fr 0.8fr 0.8fr 0.8fr 0.9fr auto;gap:8px;align-items:end;margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px;}
+.itemRow .field label{font-size:10.5px;}
+.itemRow input,.itemRow select{padding:8px;font-size:13px;}
+.miniRemove{background:var(--danger-bg);color:var(--danger);border:none;border-radius:6px;height:38px;width:38px;font-size:16px;}
+.totalsBox{background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:10px;padding:14px 18px;margin-top:12px;}
+.totalsRow{display:flex;justify-content:space-between;padding:5px 0;font-size:14px;}
+.totalsRow.grand{font-family:var(--font-display);font-size:20px;color:var(--maroon-dark);border-top:1px dashed var(--gold);margin-top:6px;padding-top:10px;}
+
+.hidden{display:none !important;}
+.searchBar{display:flex;gap:10px;margin-bottom:14px;}
+.searchBar input{flex:1;padding:11px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;}
+
+.approveBox{background:var(--warn-bg);border:1px solid var(--gold);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:13px;color:#7A5A0F;}
+.helpText{font-size:12px;color:var(--ink-soft);margin-top:4px;}
+
+[dir="rtl"]{direction:rtl;}
+.langHi{font-family:'Nirmala UI','Noto Sans Devanagari',var(--font-body);}
+
+/* ---- Girvi / Wholesaler / Calculator additions ---- */
+.agingTag{font-size:11px;color:var(--ink-soft);}
+.agingTag.late{color:var(--danger);font-weight:700;}
+.photoThumb{width:52px;height:52px;border-radius:8px;object-fit:cover;border:1px solid var(--line);}
+.photoPlaceholder{width:52px;height:52px;border-radius:8px;background:var(--bg);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ink-soft);}
+.txnList{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:10px;}
+.txnRow{display:flex;justify-content:space-between;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--line);}
+.txnRow:last-child{border-bottom:none;}
+.txnRow .txType{font-weight:700;color:var(--maroon-dark);}
+.girviDetailHead{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px;}
+.calcScreen{background:var(--maroon-dark);color:#fff;border-radius:12px;padding:18px 16px;text-align:right;font-family:var(--font-display);margin-bottom:14px;}
+.calcScreen .expr{font-size:13px;color:var(--gold-light);min-height:16px;opacity:.8;}
+.calcScreen .val{font-size:34px;margin-top:4px;word-break:break-all;}
+.calcGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.calcBtn{padding:16px 0;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:18px;font-weight:600;color:var(--ink);}
+.calcBtn.op{background:var(--gold-pale);color:var(--maroon-dark);}
+.calcBtn.eq{background:var(--maroon);color:#fff;grid-column:span 2;}
+.calcBtn.clear{background:var(--danger-bg);color:var(--danger);}
+.wsCard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff;}
+.wsCard .wsName{font-family:var(--font-display);color:var(--maroon-dark);font-size:16px;}
+.wsBalRow{display:flex;gap:18px;margin-top:6px;font-size:13px;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+
+<!-- ====================== LOCK SCREEN ====================== -->
+<div id="lockScreen">
+  <div class="lockCard">
+    <div style="display:flex;justify-content:center;"><div class="seal">GJ</div></div>
+    <h1 id="lockTitle">Gayatri Jewellers</h1>
+    <p class="sub" id="lockSub">SHOP MANAGER</p>
+    <div class="pinDots" id="pinDots"></div>
+    <div class="padGrid" id="padGrid"></div>
+    <div id="lockError"></div>
+    <div id="lockHint">Default PIN: 1234 — change it from Settings after login</div>
+  </div>
+</div>
+
+<!-- ====================== APP SHELL ====================== -->
+<div id="shell">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="mark">GJ</div>
+      <div class="txt">
+        <h2 id="brandName">Gayatri Jewellers</h2>
+        <span id="brandLoc">SONI GALI, SARWAN</span>
+      </div>
+    </div>
+    <nav class="navlist" id="navlist"></nav>
+    <div class="sideFooter">
+      <div class="langToggle">
+        <div id="langEnBtn" class="active">EN</div>
+        <div id="langHiBtn">हिं</div>
+      </div>
+      <button id="quickBackupBtn">⬇ Backup Now</button>
+      <button id="lockNowBtn">🔒 Lock App</button>
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <div id="topDateTime" class="topClockSub"></div>
+      </div>
+      <div class="rateStrip">
+        <div class="ratePill">🥇 <span id="topGoldRate">-</span></div>
+        <div class="ratePill">🥈 <span id="topSilverRate">-</span></div>
+      </div>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<div class="modalWrap" id="modalWrap">
+  <div class="modal" id="modalBox">
+    <div class="modalHead">
+      <h3 id="modalTitle">Title</h3>
+      <button class="modalClose" onclick="closeModal()">×</button>
+    </div>
+    <div class="modalBody" id="modalBody"></div>
+    <div class="modalFoot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="restoreFileInput" accept=".json" style="display:none;">
+
+<script>
+/* =====================================================================
+   GAYATRI JEWELLERS — OFFLINE SHOP MANAGER
+   Single-file offline ERP. All data in localStorage. No network calls.
+===================================================================== */
+
+const DB_KEY = 'gj_erp_db_v1';
+const uid = (p='ID') => p + '-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+const nowISO = () => new Date().toISOString();
+const todayStr = () => new Date().toISOString().slice(0,10);
+const fmtDate = (iso) => { if(!iso) return '-'; const d=new Date(iso); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
+const fmtMoney = (n) => '₹' + (Number(n)||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+const fmtWt = (n) => (Number(n)||0).toLocaleString('en-IN',{maximumFractionDigits:3}) + ' g';
+const daysBetween = (fromISODate, toISODate) => {
+  if(!fromISODate) return 0;
+  const a = new Date(fromISODate+'T00:00:00'), b = new Date((toISODate||todayStr())+'T00:00:00');
+  return Math.max(Math.round((b-a)/86400000), 0);
+};
+
+function defaultDB(){
+  return {
+    meta:{
+      shopName:'Gayatri Jewellers', location:'Soni Gali, Sarwan, Madhya Pradesh, India',
+      startDate:'2024-01-22', pin:'1234', ownerPin:'9999', language:'en',
+      discountApprovalThresholdPct: 3, lastBackupAt:null
+    },
+    rateHistory:[],
+    currentRates:{ gold24:9800, gold22:8990, silverKg:88000, updatedAt: nowISO() },
+    customers:[],
+    sales:[], buying:[], girvi:[], creditEntries:[], inventory:[], jobs:[], exchange:[],
+    expenses:[], cashDays:[], staff:[{id:uid('STF'),name:'Owner',role:'owner',pin:'1234'}],
+    wholesalers:[], wholesalerEntries:[],
+    history:[]
+  };
+}
+/* Backward-compatible migration: fills in any fields added in later app updates
+   without touching or erasing existing shop data. */
+function migrateDB(d){
+  if(!d.wholesalers) d.wholesalers=[];
+  if(!d.wholesalerEntries) d.wholesalerEntries=[];
+  if(d.meta && d.meta.discountApprovalThresholdPct===undefined) d.meta.discountApprovalThresholdPct=3;
+  (d.girvi||[]).forEach(g=>{
+    if(!g.transactions){
+      g.transactions=[{id:uid('GTX'), date:g.date, type:'Loan Given', amount:g.loanAmount, note:'Initial girvi loan'}];
+    }
+    if(g.photo===undefined) g.photo=null;
+    if(g.outstandingPrincipal===undefined){
+      let principal = g.loanAmount||0;
+      g.transactions.forEach(t=>{
+        if(t.type==='Additional Loan') principal += t.amount;
+        if(t.type==='Part Payment') principal -= t.amount;
+      });
+      g.outstandingPrincipal = Math.max(principal,0);
+    }
+  });
+  (d.sales||[]).forEach(s=>{ (s.items||[]).forEach(i=>{ if(i.purity===undefined || i.purity==='') i.purity=100; }); });
+  (d.buying||[]).forEach(b=>{ if(b.purity===undefined || b.purity==='') b.purity=100; });
+  return d;
+}
+let DB = loadDB();
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(!raw) { const d=defaultDB(); localStorage.setItem(DB_KEY, JSON.stringify(d)); return d; }
+    return migrateDB(JSON.parse(raw));
+  }catch(e){ return defaultDB(); }
+}
+function saveDB(){
+  try{
+    localStorage.setItem(DB_KEY, JSON.stringify(DB));
+    renderRateStrip();
+    return true;
+  }catch(err){
+    toast('⚠️ Could not save — device storage is full. Please back up and free up space.');
+    return false;
+  }
+}
+function logHistory(module, action, description){
+  DB.history.unshift({id:uid('H'), ts:nowISO(), module, action, description});
+  if(DB.history.length>3000) DB.history.length=3000;
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(window._toastT); window._toastT=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+/* ---------------------- I18N ---------------------- */
+const STR = {
+  en:{
+    dashboard:'Dashboard', sales:'Sales', buying:'Buying', girvi:'Girvi (Loan)', credit:'Credit / Udhaar',
+    inventory:'Inventory', jobs:'Manufacturing & Repair', exchange:'Exchange', ledger:'Customer Ledger',
+    history:'History', reports:'Reports', settings:'Settings',
+    newSale:'New Sale', newPurchase:'New Purchase', newGirvi:'New Girvi Loan', newJob:'New Job',
+    newExchange:'New Exchange', addItem:'Add Item', save:'Save', cancel:'Cancel', search:'Search...',
+    customer:'Customer', phone:'Phone', total:'Total', amountPaid:'Amount Paid', balance:'Balance',
+    date:'Date', status:'Status', action:'Action', weight:'Weight (g)', purity:'Purity', rate:'Rate',
+    making:'Making Charge', discount:'Discount', category:'Category', metal:'Metal', gold:'Gold', silver:'Silver',
+  },
+  hi:{
+    dashboard:'डैशबोर्ड', sales:'बिक्री', buying:'खरीद', girvi:'गिरवी (लोन)', credit:'उधार / क्रेडिट',
+    inventory:'स्टॉक', jobs:'निर्माण व मरम्मत', exchange:'अदला-बदली', ledger:'ग्राहक खाता',
+    history:'इतिहास', reports:'रिपोर्ट', settings:'सेटिंग्स',
+    newSale:'नई बिक्री', newPurchase:'नई खरीद', newGirvi:'नया गिरवी लोन', newJob:'नया काम',
+    newExchange:'नई अदला-बदली', addItem:'आइटम जोड़ें', save:'सेव करें', cancel:'रद्द करें', search:'खोजें...',
+    customer:'ग्राहक', phone:'फोन', total:'कुल', amountPaid:'भुगतान राशि', balance:'बकाया',
+    date:'तारीख', status:'स्थिति', action:'कार्य', weight:'वज़न (ग्राम)', purity:'शुद्धता', rate:'दर',
+    making:'मज़दूरी', discount:'छूट', category:'श्रेणी', metal:'धातु', gold:'सोना', silver:'चांदी',
+  }
+};
+function T(key){ const l=DB.meta.language||'en'; return (STR[l]&&STR[l][key]) || STR.en[key] || key; }
+
+/* ---------------------- NAV CONFIG ---------------------- */
+const NAV = [
+  {id:'dashboard', num:'', label:'Dashboard', hi:'डैशबोर्ड', icon:'🏠', group:'main'},
+  {id:'sales', num:'1', label:'Sales', hi:'बिक्री', icon:'🧾', group:'main'},
+  {id:'buying', num:'2', label:'Buying', hi:'खरीद', icon:'⚖️', group:'main'},
+  {id:'girvi', num:'3', label:'Girvi', hi:'गिरवी', icon:'🔐', group:'main'},
+  {id:'credit', num:'4', label:'Credit', hi:'उधार', icon:'📒', group:'main'},
+  {id:'inventory', num:'5', label:'Inventory', hi:'स्टॉक', icon:'💍', group:'main'},
+  {id:'jobs', num:'6', label:'Manufacturing & Repair', hi:'निर्माण व मरम्मत', icon:'🛠️', group:'main'},
+  {id:'exchange', num:'7', label:'Exchange', hi:'अदला-बदली', icon:'🔁', group:'main'},
+  {id:'ledger', num:'8', label:'Customer Ledger', hi:'ग्राहक खाता', icon:'👤', group:'main'},
+  {id:'history', num:'9', label:'History', hi:'इतिहास', icon:'🕘', group:'main'},
+  {id:'reports', num:'10', label:'Reports', hi:'रिपोर्ट', icon:'📊', group:'main'},
+  {id:'settings', num:'11', label:'Settings', hi:'सेटिंग्स', icon:'⚙️', group:'main'},
+  {id:'cashday', num:'', label:'Cash / Day Close', hi:'कैश डे क्लोज़', icon:'💰', group:'extra'},
+  {id:'expenses', num:'', label:'Expenses', hi:'खर्च', icon:'🧮', group:'extra'},
+  {id:'wholesaler', num:'', label:'Wholesaler Khata', hi:'थोक व्यापारी खाता', icon:'📇', group:'extra'},
+  {id:'calculator', num:'', label:'Calculator', hi:'कैलकुलेटर', icon:'🖩', group:'extra'},
+];
+
+let currentPage='dashboard';
+
+function renderNav(){
+  const el = document.getElementById('navlist'); el.innerHTML='';
+  const lang = DB.meta.language;
+  let grp='';
+  NAV.forEach(item=>{
+    if(item.group!==grp){
+      grp=item.group;
+      const lbl=document.createElement('div'); lbl.className='navGroupLabel';
+      lbl.textContent = grp==='main' ? (lang==='hi'?'मुख्य मॉड्यूल':'Modules') : (lang==='hi'?'अतिरिक्त':'Extras');
+      el.appendChild(lbl);
+    }
+    const d=document.createElement('div');
+    d.className='navitem'+(currentPage===item.id?' active':'');
+    d.innerHTML = `<span class="num">${item.num}</span><span>${item.icon}</span><span>${lang==='hi'?item.hi:item.label}</span>`;
+    d.onclick=()=>goTo(item.id);
+    el.appendChild(d);
+  });
+}
+function goTo(id){
+  currentPage=id; renderNav();
+  const item = NAV.find(n=>n.id===id);
+  document.getElementById('pageTitle').textContent = DB.meta.language==='hi'?item.hi:item.label;
+  const renderFn = PAGES[id];
+  document.getElementById('content').innerHTML='';
+  if(renderFn) renderFn();
+}
+function renderRateStrip(){
+  document.getElementById('topGoldRate').textContent = fmtMoney(DB.currentRates.gold24)+'/10g';
+  document.getElementById('topSilverRate').textContent = fmtMoney(DB.currentRates.silverKg)+'/kg';
+}
+
+/* ---------------------- MODAL HELPERS ---------------------- */
+function openModal(title, bodyHTML, footButtons){
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').innerHTML=bodyHTML;
+  const foot=document.getElementById('modalFoot'); foot.innerHTML='';
+  (footButtons||[]).forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+(b.cls||'btn-ghost'); btn.textContent=b.label;
+    btn.onclick=b.onClick; foot.appendChild(btn);
+  });
+  document.getElementById('modalWrap').classList.add('active');
+}
+function closeModal(){ document.getElementById('modalWrap').classList.remove('active'); }
+
+function askOwnerApproval(reason, cb){
+  openModal('Owner Approval Required',
+    `<p style="margin-top:0">${reason}</p>
+     <div class="field"><label>Owner PIN</label><input type="password" id="ownerPinInput" maxlength="6" placeholder="Enter owner PIN"></div>
+     <div id="ownerPinErr" style="color:var(--danger);font-size:12px;margin-top:6px;"></div>`,
+    [
+      {label:'Cancel', cls:'btn-ghost', onClick:closeModal},
+      {label:'Approve', cls:'btn-primary', onClick:()=>{
+        const val = document.getElementById('ownerPinInput').value;
+        if(val===DB.meta.ownerPin){ closeModal(); cb(true); }
+        else{ document.getElementById('ownerPinErr').textContent='Incorrect PIN'; }
+      }}
+    ]);
+}
+
+function confirmAction(msg, cb){
+  openModal('Please Confirm', `<p style="margin-top:0">${msg}</p>`, [
+    {label:'Cancel', cls:'btn-ghost', onClick:closeModal},
+    {label:'Confirm', cls:'btn-primary', onClick:()=>{ closeModal(); cb(); }}
+  ]);
+}
+
+/* ---------------------- MANAGER PIN GUARD (edit / delete anything) ---------------------- */
+function guardEdit(entityLabel, cb){
+  askOwnerApproval(`Enter manager PIN to edit this ${entityLabel}.`, cb);
+}
+function guardDelete(entityLabel, cb){
+  askOwnerApproval(`Enter manager PIN to delete this ${entityLabel}. It will disappear from lists and totals, but stays in History for reference — nothing is permanently erased.`, ()=>{
+    confirmAction(`Delete this ${entityLabel}? This can only be undone by an owner restoring from a backup.`, cb);
+  });
+}
+
+/* ---------------------- CUSTOMER HELPERS ---------------------- */
+function findOrCreateCustomer(name, phone){
+  name=(name||'').trim(); if(!name) return null;
+  let c = DB.customers.find(x=>x.name.toLowerCase()===name.toLowerCase() && (!phone || x.phone===phone));
+  if(!c){
+    c = {id:uid('CUS'), name, phone:phone||'', address:'', notes:'', createdAt:nowISO()};
+    DB.customers.push(c);
+    logHistory('Customer','Created','New customer added: '+name);
+  }
+  return c;
+}
+function customerBalance(customerId){
+  let bal=0;
+  DB.creditEntries.filter(e=>e.customerId===customerId && !e.deleted).forEach(e=>{ bal += (e.type==='debit'? e.amount : -e.amount); });
+  return bal;
+}
+function customerOptionsHTML(){
+  return DB.customers.map(c=>`<option value="${c.id}">${c.name}${c.phone?' — '+c.phone:''}</option>`).join('');
+}
+
+/* =====================================================================
+   PAGE: DASHBOARD
+===================================================================== */
+function renderDashboard(){
+  const today = todayStr();
+  const todaySales = DB.sales.filter(s=>s.date===today && !s.void && !s.deleted);
+  const todaySalesTotal = todaySales.reduce((a,s)=>a+s.grandTotal,0);
+  const activeGirvi = DB.girvi.filter(g=>g.status==='active' && !g.deleted);
+  const totalGirviOut = activeGirvi.reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0);
+  const creditDue = DB.customers.reduce((a,c)=> a + Math.max(customerBalance(c.id),0), 0);
+  const pendingJobs = DB.jobs.filter(j=>j.status!=='delivered' && !j.void && !j.deleted);
+  const lowStock = DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted);
+  const overdueGirvi = activeGirvi.filter(g=>g.dueDate && g.dueDate < today);
+  const wholesalerTotals = DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,cash:0});
+
+  let html = `<div class="statGrid">
+    <div class="statCard"><div class="lbl">Today's Sales</div><div class="val">${fmtMoney(todaySalesTotal)}</div><div class="sub">${todaySales.length} bill(s)</div></div>
+    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Active Girvi Loans</div><div class="val">${fmtMoney(totalGirviOut)}</div><div class="sub">${activeGirvi.length} item(s) held</div></div>
+    <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Total Credit Due</div><div class="val">${fmtMoney(creditDue)}</div><div class="sub">across ${DB.customers.length} customers</div></div>
+    <div class="statCard" style="border-color:var(--success)"><div class="lbl">Pending Jobs</div><div class="val">${pendingJobs.length}</div><div class="sub">${DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted).length} items in stock</div></div>
+    <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Silver Owed to Wholesalers</div><div class="val">${fmtWt(wholesalerTotals.silver)}</div><div class="sub">Cash/labour owed: ${fmtMoney(wholesalerTotals.cash)}</div></div>
+  </div>`;
+
+  html += `<div class="grid grid-2">`;
+  html += `<div class="card"><div class="cardHead"><h3>⚠️ Alerts & Reminders</h3></div>`;
+  const alerts=[];
+  overdueGirvi.forEach(g=> alerts.push(`Girvi loan for <b>${g.customerName}</b> (${fmtWt(g.weight)}) is overdue since ${fmtDate(g.dueDate)}.`));
+  DB.customers.forEach(c=>{ const b=customerBalance(c.id); if(b>0) alerts.push(`<b>${c.name}</b> has outstanding credit of ${fmtMoney(b)}.`); });
+  pendingJobs.filter(j=>j.expectedDate && j.expectedDate<today).forEach(j=> alerts.push(`Job for <b>${j.customerName}</b> (${j.itemDesc}) is overdue for delivery.`));
+  if(alerts.length===0) html+=`<div class="empty"><div class="big">✅</div>No pending alerts. All caught up.</div>`;
+  else html += `<div>` + alerts.slice(0,8).map(a=>`<div style="padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;">🔸 ${a}</div>`).join('') + `</div>`;
+  html += `</div>`;
+
+  html += `<div class="card"><div class="cardHead"><h3>Today's Rates</h3><button class="btn btn-sm btn-outline" onclick="goTo('settings')">Update Rate</button></div>
+    <table><tr><th>Metal</th><th>Rate</th></tr>
+    <tr><td>Gold 24K</td><td>${fmtMoney(DB.currentRates.gold24)} / 10g</td></tr>
+    <tr><td>Gold 22K</td><td>${fmtMoney(DB.currentRates.gold22)} / 10g</td></tr>
+    <tr><td>Silver</td><td>${fmtMoney(DB.currentRates.silverKg)} / kg</td></tr>
+    </table><div class="helpText">Last updated: ${fmtDate(DB.currentRates.updatedAt)}</div></div>`;
+  html += `</div>`;
+
+  html += `<div class="card"><div class="cardHead"><h3>Quick Actions</h3></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="goTo('sales')">🧾 New Sale</button>
+      <button class="btn btn-outline" onclick="goTo('buying')">⚖️ New Purchase</button>
+      <button class="btn btn-outline" onclick="goTo('girvi')">🔐 New Girvi</button>
+      <button class="btn btn-outline" onclick="goTo('jobs')">🛠️ New Job</button>
+      <button class="btn btn-outline" onclick="goTo('wholesaler')">📇 Wholesaler Khata</button>
+      <button class="btn btn-outline" onclick="goTo('calculator')">🖩 Calculator</button>
+    </div></div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+/* =====================================================================
+   PAGE: SALES
+===================================================================== */
+let saleDraftItems = [];
+let editingSaleId = null;
+function renderSales(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;">
+    <div></div>
+    <button class="btn btn-primary" onclick="openSaleForm()">+ ${T('newSale')}</button>
+  </div>`;
+  html += `<div class="card"><div class="searchBar"><input id="saleSearch" placeholder="Search by customer or item..." oninput="filterSalesTable()"></div><div id="salesTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  filterSalesTable();
+}
+function filterSalesTable(){
+  const q = (document.getElementById('saleSearch')?.value||'').toLowerCase();
+  let rows = [...DB.sales].filter(s=>!s.deleted).sort((a,b)=> b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  if(q) rows = rows.filter(s => s.customerName.toLowerCase().includes(q) || s.items.some(i=>i.itemName.toLowerCase().includes(q)));
+  let html = `<table><tr><th>Date</th><th>Bill No</th><th>Customer</th><th>Weight</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="9"><div class="empty"><div class="big">🧾</div>No sales yet. Create your first bill.</div></td></tr>`;
+  rows.forEach(s=>{
+    const wt = s.items.reduce((a,i)=>a+Number(i.weight||0),0);
+    html += `<tr>
+      <td>${fmtDate(s.date)}</td><td>${s.billNo}</td><td>${s.customerName}</td><td>${fmtWt(wt)}</td>
+      <td>${fmtMoney(s.grandTotal)}</td><td>${fmtMoney(s.amountPaid)}</td><td>${fmtMoney(s.grandTotal-s.amountPaid)}</td>
+      <td>${s.void?'<span class="tag tag-red">VOID</span>':(s.grandTotal-s.amountPaid<=0?'<span class="tag tag-green">Paid</span>':'<span class="tag tag-gold">Due</span>')}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="viewSale('${s.id}')">View</button></td>
+    </tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('salesTableWrap').innerHTML = html;
+}
+function deleteSale(id){
+  const s = DB.sales.find(x=>x.id===id); if(!s) return;
+  guardDelete('sale bill ('+s.billNo+')', ()=>{
+    s.deleted = true;
+    logHistory('Sales','Deleted', `Bill ${s.billNo} for ${s.customerName} deleted`);
+    saveDB(); closeModal(); renderSales(); toast('Bill deleted');
+  });
+}
+function openSaleForm(editId){
+  const existing = editId ? DB.sales.find(s=>s.id===editId) : null;
+  editingSaleId = existing ? existing.id : null;
+  saleDraftItems = existing ? existing.items.map(i=>({...i, purity:(i.purity===undefined||i.purity==='')?100:i.purity})) : [];
+  const existingCust = existing ? DB.customers.find(c=>c.id===existing.customerId) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>${T('customer')} *</label><input list="custList" id="saleCustomer" placeholder="Type or select customer" value="${existing?existing.customerName:''}">
+        <datalist id="custList">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>${T('phone')}</label><input id="salePhone" placeholder="10-digit mobile" value="${existingCust?existingCust.phone:''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>${T('date')} <span class="helpText">(back-date allowed)</span></label><input type="date" id="saleDate" value="${existing?existing.date:todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>Payment Mode</label><select id="salePayMode">
+        ${['Cash','UPI','Card','Part Credit','Full Credit'].map(m=>`<option ${existing&&existing.paymentMode===m?'selected':''}>${m}</option>`).join('')}
+      </select></div>
+    </div>
+    <div style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <label style="font-weight:600;font-size:13px;color:var(--ink-soft);">ITEMS</label>
+        <button class="btn btn-sm btn-outline" onclick="addSaleItemRow()">+ ${T('addItem')}</button>
+      </div>
+      <div id="saleItemsWrap" style="margin-top:10px;"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="field"><label>${T('discount')} (₹)</label><input type="number" id="saleDiscount" value="${existing?existing.discount:0}" oninput="recalcSaleTotals()"></div>
+      <div class="field"><label>Amount Paid</label><input type="number" id="saleAmountPaid" value="${existing?existing.amountPaid:''}" placeholder="auto = grand total"></div>
+    </div>
+    <div class="totalsBox" id="saleTotalsBox"></div>
+    <div id="saleApprovalNote"></div>
+  `;
+  openModal(existing?('Edit Sale — '+existing.billNo):T('newSale'), body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:existing?'Save Changes':T('save')+' Bill', cls:'btn-primary', onClick:saveSale}
+  ]);
+  if(!existing) addSaleItemRow(); else renderSaleItemRows();
+  recalcSaleTotals();
+}
+function addSaleItemRow(){
+  saleDraftItems.push({itemName:'', category:'Silver', weight:0, purity:100, rate:0, making:0, itemDiscount:0});
+  renderSaleItemRows();
+}
+function removeSaleItemRow(i){ saleDraftItems.splice(i,1); renderSaleItemRows(); recalcSaleTotals(); }
+function renderSaleItemRows(){
+  const wrap = document.getElementById('saleItemsWrap');
+  wrap.innerHTML = saleDraftItems.map((it,i)=>{
+    const purity = (it.purity===undefined||it.purity==='')?100:it.purity;
+    const pureWt = (Number(it.weight)||0) * (Number(purity)||0)/100;
+    return `
+    <div class="itemRow" style="grid-template-columns:1.2fr 0.85fr 0.7fr 0.75fr 0.8fr 0.75fr 0.8fr 0.85fr auto;">
+      <div class="field"><label>Item</label><input value="${it.itemName}" placeholder="e.g. Silver Payal" oninput="saleDraftItems[${i}].itemName=this.value"></div>
+      <div class="field"><label>${T('category')}</label>
+        <select onchange="saleDraftItems[${i}].category=this.value; autoFillRate(${i}); recalcSaleTotals();">
+          <option ${it.category==='Silver'?'selected':''}>Silver</option>
+          <option ${it.category==='Gold'?'selected':''}>Gold</option>
+          <option ${it.category==='Part Silver'?'selected':''}>Part Silver</option>
+          <option ${it.category==='Khirchi Silver'?'selected':''}>Khirchi Silver</option>
+          <option ${it.category==='Custom'?'selected':''}>Custom</option>
+        </select></div>
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" value="${it.weight}" oninput="saleDraftItems[${i}].weight=parseFloat(this.value)||0; recalcSaleTotals();"></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" step="0.1" value="${purity}" placeholder="e.g. 90" oninput="saleDraftItems[${i}].purity=parseFloat(this.value)||0; recalcSaleTotals();"></div>
+      <div class="field"><label>Pure Wt</label><input value="${pureWt.toFixed(3)}" disabled style="background:var(--bg);color:var(--ink-soft);"></div>
+      <div class="field"><label>${T('rate')}/g</label><input type="number" value="${it.rate}" oninput="saleDraftItems[${i}].rate=parseFloat(this.value)||0; recalcSaleTotals();"></div>
+      <div class="field"><label>${T('making')}</label><input type="number" value="${it.making}" oninput="saleDraftItems[${i}].making=parseFloat(this.value)||0; recalcSaleTotals();"></div>
+      <div class="field"><label>Amount</label><input value="${fmtMoney(pureWt*(it.rate||0)+Number(it.making||0))}" disabled style="background:var(--bg);color:var(--ink-soft);"></div>
+      <button class="miniRemove" onclick="removeSaleItemRow(${i})">✕</button>
+    </div>
+  `;}).join('');
+  saleDraftItems.forEach((it,i)=> autoFillRate(i));
+}
+function autoFillRate(i){
+  const it = saleDraftItems[i]; if(!it) return;
+  if(it.rate) return;
+  if(it.category==='Gold') it.rate = DB.currentRates.gold22/10;
+  else if(it.category!=='Custom') it.rate = DB.currentRates.silverKg/1000;
+}
+function recalcSaleTotals(){
+  let sub=0, wt=0, pureWt=0;
+  saleDraftItems.forEach(it=>{
+    const purity = (it.purity===undefined||it.purity==='') ? 100 : Number(it.purity);
+    const pw = (Number(it.weight)||0) * (purity/100);
+    pureWt += pw; wt += Number(it.weight||0);
+    sub += (pw*(it.rate||0)) + Number(it.making||0);
+  });
+  const discount = parseFloat(document.getElementById('saleDiscount')?.value)||0;
+  const grand = Math.max(sub-discount,0);
+  const pct = sub>0 ? (discount/sub*100) : 0;
+  document.getElementById('saleTotalsBox').innerHTML = `
+    <div class="totalsRow"><span>Total Weight</span><span>${fmtWt(wt)}</span></div>
+    <div class="totalsRow"><span>Pure Weight (by purity)</span><span>${fmtWt(pureWt)}</span></div>
+    <div class="totalsRow"><span>Subtotal</span><span>${fmtMoney(sub)}</span></div>
+    <div class="totalsRow"><span>${T('discount')}</span><span>- ${fmtMoney(discount)}</span></div>
+    <div class="totalsRow grand"><span>Grand Total</span><span>${fmtMoney(grand)}</span></div>`;
+  const note = document.getElementById('saleApprovalNote');
+  if(note){
+    if(pct > DB.meta.discountApprovalThresholdPct){
+      note.innerHTML = `<div class="approveBox">⚠️ Discount is ${pct.toFixed(1)}%, above the ${DB.meta.discountApprovalThresholdPct}% limit. Owner approval will be required to save this bill.</div>`;
+    } else note.innerHTML='';
+  }
+}
+function saveSale(){
+  const custName = document.getElementById('saleCustomer').value.trim();
+  if(!custName){ toast('Please enter customer name'); return; }
+  if(saleDraftItems.length===0 || saleDraftItems.every(i=>!i.itemName)){ toast('Add at least one item'); return; }
+  const phone = document.getElementById('salePhone').value.trim();
+  const discount = parseFloat(document.getElementById('saleDiscount').value)||0;
+  const payMode = document.getElementById('salePayMode').value;
+  const saleDate = document.getElementById('saleDate').value || todayStr();
+  const manualPaid = document.getElementById('saleAmountPaid').value;
+  let sub=0; saleDraftItems.forEach(it=>{ const purity=(it.purity===undefined||it.purity==='')?100:Number(it.purity); const pw=(it.weight||0)*(purity/100); sub += (pw*(it.rate||0))+Number(it.making||0); });
+  const pct = sub>0 ? (discount/sub*100):0;
+
+  const finalize = ()=>{
+    const cust = findOrCreateCustomer(custName, phone);
+    const grand = Math.max(sub-discount,0);
+    const amountPaid = manualPaid!=='' ? (parseFloat(manualPaid)||0) : ((payMode==='Full Credit') ? 0 : grand);
+    const cleanItems = saleDraftItems.filter(i=>i.itemName).map(i=>({...i, purity:(i.purity===undefined||i.purity==='')?100:Number(i.purity)}));
+    if(editingSaleId){
+      const s = DB.sales.find(x=>x.id===editingSaleId);
+      s.customerId=cust.id; s.customerName=cust.name; s.date=saleDate; s.items=cleanItems;
+      s.subTotal=sub; s.discount=discount; s.discountPct=pct; s.grandTotal=grand; s.paymentMode=payMode; s.amountPaid=amountPaid;
+      logHistory('Sales','Edited', `Bill ${s.billNo} edited for ${cust.name} — new total ${fmtMoney(grand)}`);
+      saveDB(); closeModal(); toast('Sale updated: '+s.billNo); renderSales();
+    } else {
+      const sale = {
+        id: uid('SAL'), billNo: 'INV-'+(DB.sales.length+1001), date: saleDate, createdAt: nowISO(),
+        customerId: cust.id, customerName: cust.name, items: cleanItems,
+        subTotal: sub, discount, discountPct: pct, grandTotal: grand, paymentMode: payMode, amountPaid, void:false
+      };
+      DB.sales.push(sale);
+      if(amountPaid < grand){
+        DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:saleDate, type:'debit', amount: grand-amountPaid, description:'Sale '+sale.billNo, createdAt: nowISO()});
+      }
+      logHistory('Sales','Created', `Bill ${sale.billNo} for ${cust.name} — ${fmtMoney(grand)}`);
+      saveDB(); closeModal(); toast('Sale saved: '+sale.billNo); renderSales();
+    }
+  };
+
+  if(pct > DB.meta.discountApprovalThresholdPct){
+    askOwnerApproval(`This bill has a discount of ${pct.toFixed(1)}%, above the allowed ${DB.meta.discountApprovalThresholdPct}%. Owner PIN is required to proceed.`, ()=>finalize());
+  } else finalize();
+}
+function viewSale(id){
+  const s = DB.sales.find(x=>x.id===id); if(!s) return;
+  let body = `<div class="grid grid-2" style="margin-bottom:14px;">
+    <div><b>Bill No:</b> ${s.billNo}</div><div><b>Date:</b> ${fmtDate(s.date)}</div>
+    <div><b>Customer:</b> ${s.customerName}</div><div><b>Payment:</b> ${s.paymentMode}</div>
+  </div>
+  <table><tr><th>Item</th><th>Category</th><th>Wt</th><th>Purity</th><th>Pure Wt</th><th>Rate</th><th>Making</th><th>Amount</th></tr>
+  ${s.items.map(i=>{ const purity=(i.purity===undefined||i.purity==='')?100:i.purity; const pw=(i.weight||0)*(purity/100); const amt=pw*(i.rate||0)+Number(i.making||0); return `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${fmtWt(i.weight)}</td><td>${purity}%</td><td>${fmtWt(pw)}</td><td>${fmtMoney(i.rate)}</td><td>${fmtMoney(i.making)}</td><td>${fmtMoney(amt)}</td></tr>`; }).join('')}
+  </table>
+  <div class="totalsBox">
+    <div class="totalsRow"><span>Subtotal</span><span>${fmtMoney(s.subTotal)}</span></div>
+    <div class="totalsRow"><span>Discount</span><span>- ${fmtMoney(s.discount)}</span></div>
+    <div class="totalsRow grand"><span>Grand Total</span><span>${fmtMoney(s.grandTotal)}</span></div>
+    <div class="totalsRow"><span>Paid</span><span>${fmtMoney(s.amountPaid)}</span></div>
+    <div class="totalsRow"><span>Balance</span><span>${fmtMoney(s.grandTotal-s.amountPaid)}</span></div>
+  </div>`;
+  const foot = [{label:'Close', cls:'btn-ghost', onClick:closeModal}];
+  if(!s.void){
+    foot.push({label:'✎ Edit', cls:'btn-outline', onClick:()=>{ guardEdit('sale bill ('+s.billNo+')', ()=>openSaleForm(s.id)); }});
+    foot.push({label:'Void Bill', cls:'btn-danger', onClick:()=>{
+      askOwnerApproval('Voiding a bill requires owner approval. This will not delete the record — it stays in History.', ()=>{
+        s.void=true; logHistory('Sales','Voided','Bill '+s.billNo+' voided'); saveDB(); closeModal(); renderSales(); toast('Bill voided');
+      });
+    }});
+  }
+  foot.push({label:'🗑 Delete', cls:'btn-danger', onClick:()=>deleteSale(s.id)});
+  openModal('Sale — '+s.billNo, body, foot);
+}
+
+/* =====================================================================
+   PAGE: BUYING (old silver/gold purchase)
+===================================================================== */
+let editingBuyId = null;
+function renderBuying(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openBuyForm()">+ ${T('newPurchase')}</button></div>`;
+  html += `<div class="card"><div class="searchBar"><input id="buySearch" placeholder="Search by customer or item..." oninput="renderBuyTable()"></div><div id="buyTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderBuyTable();
+}
+function renderBuyTable(){
+  const q = (document.getElementById('buySearch')?.value||'').toLowerCase();
+  let rows = [...DB.buying].filter(b=>!b.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(q) rows = rows.filter(b=> b.customerName.toLowerCase().includes(q) || (b.itemDesc||'').toLowerCase().includes(q));
+  let html = `<table><tr><th>Date</th><th>Customer</th><th>Item</th><th>Metal</th><th>Wt</th><th>Purity</th><th>Pure Wt</th><th>Rate</th><th>Amount</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="10"><div class="empty"><div class="big">⚖️</div>No purchases recorded yet.</div></td></tr>`;
+  rows.forEach(b=>{
+    const purity = (b.purity===undefined||b.purity==='')?100:Number(b.purity);
+    const pw = (Number(b.weight)||0) * (purity/100);
+    html += `<tr><td>${fmtDate(b.date)}</td><td>${b.customerName}</td><td>${b.itemDesc}</td><td>${b.metal}</td><td>${fmtWt(b.weight)}</td><td>${purity}%</td><td>${fmtWt(pw)}</td><td>${fmtMoney(b.rateApplied)}</td><td>${fmtMoney(b.amount)}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('purchase entry', ()=>openBuyForm('${b.id}'))">✎ Edit</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteBuy('${b.id}')">🗑</button></td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('buyTableWrap').innerHTML = html;
+}
+function deleteBuy(id){
+  const b = DB.buying.find(x=>x.id===id); if(!b) return;
+  guardDelete('purchase entry ('+b.itemDesc+')', ()=>{
+    b.deleted = true;
+    logHistory('Buying','Deleted', `Purchase from ${b.customerName} (${b.itemDesc}) deleted`);
+    saveDB(); renderBuying(); toast('Purchase deleted');
+  });
+}
+function openBuyForm(id){
+  editingBuyId = id||null;
+  const b = id ? DB.buying.find(x=>x.id===id) : null;
+  const purity = b ? ((b.purity===undefined||b.purity==='')?100:b.purity) : 100;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>${T('customer')} *</label><input list="custList2" id="buyCustomer" value="${b?b.customerName:''}">
+      <datalist id="custList2">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>${T('phone')}</label><input id="buyPhone" value="${b?(DB.customers.find(c=>c.id===b.customerId)?.phone||''):''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Item Description</label><input id="buyItemDesc" placeholder="Old silver anklet" value="${b?b.itemDesc:''}"></div>
+      <div class="field"><label>${T('metal')}</label><select id="buyMetal" onchange="buyAutoRate()"><option ${b&&b.metal==='Silver'?'selected':''}>Silver</option><option ${b&&b.metal==='Gold'?'selected':''}>Gold</option></select></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="buyWeight" value="${b?b.weight:''}" oninput="buyRecalc()"></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" step="0.1" id="buyPurity" placeholder="e.g. 90" value="${purity}" oninput="buyRecalc()"></div>
+      <div class="field"><label>${T('rate')}/g (pure)</label><input type="number" id="buyRate" value="${b?b.rateApplied:''}" oninput="buyRecalc()"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>${T('date')}</label><input type="date" id="buyDate" value="${b?b.date:todayStr()}"></div>
+      <div class="field"><label>Payment Mode</label><select id="buyPayMode"><option ${b&&b.paymentMode==='Cash'?'selected':''}>Cash</option><option ${b&&b.paymentMode==='UPI'?'selected':''}>UPI</option><option ${b&&b.paymentMode==='Adjust in Sale'?'selected':''}>Adjust in Sale</option></select></div>
+    </div>
+    <div class="totalsBox">
+      <div class="totalsRow"><span>Pure Weight (wt × purity%)</span><span id="buyPureWtOut">0 g</span></div>
+      <div class="totalsRow grand"><span>Amount Payable</span><span id="buyAmountOut">₹0</span></div>
+    </div>
+    <div class="helpText">Formula: weight × purity% = pure weight, then pure weight × rate = amount.</div>
+  `;
+  openModal(id?'Edit Purchase':T('newPurchase'), body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:id?'Save Changes':T('save'), cls:'btn-primary', onClick:saveBuy}
+  ]);
+  if(!b) buyAutoRate(); else buyRecalc();
+}
+function buyAutoRate(){
+  const metal = document.getElementById('buyMetal').value;
+  document.getElementById('buyRate').value = metal==='Gold' ? (DB.currentRates.gold22/10).toFixed(2) : (DB.currentRates.silverKg/1000).toFixed(2);
+  buyRecalc();
+}
+function buyRecalc(){
+  const w = parseFloat(document.getElementById('buyWeight').value)||0;
+  const purity = parseFloat(document.getElementById('buyPurity').value);
+  const p = (purity===undefined||isNaN(purity)) ? 100 : purity;
+  const r = parseFloat(document.getElementById('buyRate').value)||0;
+  const pw = w*(p/100);
+  document.getElementById('buyPureWtOut').textContent = fmtWt(pw);
+  document.getElementById('buyAmountOut').textContent = fmtMoney(pw*r);
+}
+function saveBuy(){
+  const name = document.getElementById('buyCustomer').value.trim();
+  if(!name){ toast('Enter customer name'); return; }
+  const cust = findOrCreateCustomer(name, document.getElementById('buyPhone').value.trim());
+  const weight = parseFloat(document.getElementById('buyWeight').value)||0;
+  const purityRaw = parseFloat(document.getElementById('buyPurity').value);
+  const purity = (purityRaw===undefined||isNaN(purityRaw)) ? 100 : purityRaw;
+  const rate = parseFloat(document.getElementById('buyRate').value)||0;
+  const pureWeight = weight*(purity/100);
+  const date = document.getElementById('buyDate').value || todayStr();
+  if(editingBuyId){
+    const b = DB.buying.find(x=>x.id===editingBuyId);
+    b.customerId=cust.id; b.customerName=cust.name; b.itemDesc=document.getElementById('buyItemDesc').value;
+    b.metal=document.getElementById('buyMetal').value; b.purity=purity; b.weight=weight; b.rateApplied=rate;
+    b.amount=pureWeight*rate; b.date=date; b.paymentMode=document.getElementById('buyPayMode').value;
+    logHistory('Buying','Edited', `Purchase from ${cust.name} edited — ${fmtMoney(b.amount)}`);
+    saveDB(); closeModal(); toast('Purchase updated'); renderBuying();
+  } else {
+    const b = {
+      id: uid('BUY'), date, createdAt: nowISO(), customerId:cust.id, customerName:cust.name,
+      itemDesc: document.getElementById('buyItemDesc').value, metal: document.getElementById('buyMetal').value,
+      purity, weight, rateApplied: rate, amount: pureWeight*rate,
+      paymentMode: document.getElementById('buyPayMode').value
+    };
+    DB.buying.push(b);
+    logHistory('Buying','Created', `Bought ${b.itemDesc} from ${cust.name} — ${fmtMoney(b.amount)}`);
+    saveDB(); closeModal(); toast('Purchase saved'); renderBuying();
+  }
+}
+
+/* =====================================================================
+   PAGE: GIRVI (loan against jewellery) — full panel with search,
+   ageing in days, photo, and a running transaction ledger per loan.
+===================================================================== */
+let grPhotoData = null;
+function renderGirvi(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openGirviForm()">+ ${T('newGirvi')}</button></div>`;
+  html += `<div class="card"><div class="searchBar"><input id="girviSearch" placeholder="Search by customer name..." oninput="renderGirviTable()"></div><div id="girviTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderGirviTable();
+}
+function girviInterestDue(g){
+  const months = daysBetween(g.lastInterestDate||g.date) / 30;
+  return Math.round((g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount) * (g.interestRatePct/100) * months);
+}
+function renderGirviTable(){
+  const q = (document.getElementById('girviSearch')?.value||'').toLowerCase();
+  let rows = [...DB.girvi].filter(g=>!g.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(q) rows = rows.filter(g=>g.customerName.toLowerCase().includes(q));
+  let html = `<table><tr><th>Date</th><th>Days at Shop</th><th>Customer</th><th>Item</th><th>Wt</th><th>Principal Due</th><th>Interest/mo</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="9"><div class="empty"><div class="big">🔐</div>${q?'No matching customer found.':'No girvi loans yet.'}</div></td></tr>`;
+  rows.forEach(g=>{
+    const days = daysBetween(g.date);
+    const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+    const tag = g.status==='active' ? (g.dueDate && g.dueDate<todayStr()?'<span class="tag tag-red">Overdue</span>':'<span class="tag tag-gold">Active</span>')
+      : g.status==='redeemed' ? '<span class="tag tag-green">Redeemed</span>' : '<span class="tag tag-gray">Forfeited</span>';
+    html += `<tr><td>${fmtDate(g.date)}</td><td><span class="agingTag ${days>60&&g.status==='active'?'late':''}">${days} din</span></td><td>${g.customerName}</td><td>${g.itemDesc}${g.photo?' 📷':''}</td><td>${fmtWt(g.weight)}</td><td>${fmtMoney(principal)}</td><td>${g.interestRatePct}%</td><td>${tag}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="viewGirvi('${g.id}')">Manage</button></td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('girviTableWrap').innerHTML = html;
+}
+function openGirviForm(){
+  grPhotoData = null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>${T('customer')} *</label><input list="custList3" id="grCustomer">
+      <datalist id="custList3">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>${T('phone')}</label><input id="grPhone"></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>Item Description</label><input id="grItem" placeholder="Silver Chain 45g"></div>
+      <div class="field"><label>${T('metal')}</label><select id="grMetal"><option>Silver</option><option>Gold</option></select></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" id="grPurity" value="100"></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="grWeight"></div>
+      <div class="field"><label>Loan Amount</label><input type="number" id="grLoanAmt"></div>
+      <div class="field"><label>Interest %/month</label><input type="number" id="grInterest" value="2"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Loan Date <span class="helpText">(back-date allowed)</span></label><input type="date" id="grDate" value="${todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>Due Date (optional)</label><input type="date" id="grDue"></div>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Customer Photo</label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="grPhotoPreview" class="photoPlaceholder">📷</div>
+        <input type="file" accept="image/*" capture="environment" id="grPhotoInput" onchange="handleGirviPhoto(event)">
+      </div>
+      <div class="helpText">Take a photo of the customer at the time of girvi — helps identify them later.</div>
+    </div>
+  `;
+  openModal(T('newGirvi'), body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:T('save'), cls:'btn-primary', onClick:saveGirvi}
+  ]);
+}
+function handleGirviPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  if(!file.type.startsWith('image/')){ toast('Please choose an image file'); return; }
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    const img = new Image();
+    img.onload = function(){
+      const maxDim = 320;
+      let w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = Math.round(h * (maxDim/w)); w = maxDim; }
+      else if(h >= w && h > maxDim){ w = Math.round(w * (maxDim/h)); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      try{
+        grPhotoData = canvas.toDataURL('image/jpeg', 0.6);
+        document.getElementById('grPhotoPreview').outerHTML = `<img id="grPhotoPreview" src="${grPhotoData}" class="photoThumb">`;
+      }catch(err){
+        toast('Could not process this photo — try a different one');
+      }
+    };
+    img.onerror = function(){ toast('Could not read this photo — try a different one'); };
+    img.src = evt.target.result;
+  };
+  reader.onerror = function(){ toast('Could not read this file'); };
+  reader.readAsDataURL(file);
+}
+function saveGirvi(){
+  const name = document.getElementById('grCustomer').value.trim();
+  if(!name){ toast('Enter customer name'); return; }
+  const cust = findOrCreateCustomer(name, document.getElementById('grPhone').value.trim());
+  const loanAmount = parseFloat(document.getElementById('grLoanAmt').value)||0;
+  const gDate = document.getElementById('grDate').value || todayStr();
+  const g = {
+    id: uid('GIR'), date: gDate, createdAt: nowISO(),
+    customerId:cust.id, customerName:cust.name, itemDesc: document.getElementById('grItem').value,
+    metal: document.getElementById('grMetal').value, purity: parseFloat(document.getElementById('grPurity').value)||100,
+    weight: parseFloat(document.getElementById('grWeight').value)||0,
+    loanAmount, interestRatePct: parseFloat(document.getElementById('grInterest').value)||0,
+    dueDate: document.getElementById('grDue').value||'', status:'active', photo: grPhotoData,
+    outstandingPrincipal: loanAmount, lastInterestDate: gDate,
+    transactions: [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan'}]
+  };
+  DB.girvi.push(g);
+  logHistory('Girvi','Created', `Loan of ${fmtMoney(g.loanAmount)} against ${g.itemDesc} for ${cust.name}`);
+  saveDB(); closeModal(); toast('Girvi loan saved'); renderGirvi();
+}
+function viewGirvi(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const days = daysBetween(g.date);
+  const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+  let body = `
+    <div class="girviDetailHead">
+      ${g.photo?`<img src="${g.photo}" class="photoThumb" style="width:64px;height:64px;">`:`<div class="photoPlaceholder" style="width:64px;height:64px;">📷</div>`}
+      <div>
+        <div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${g.customerName}</div>
+        <div class="helpText">${g.itemDesc} — ${fmtWt(g.weight)}, ${g.purity||100}% ${g.metal}</div>
+        <div class="helpText">Loan date: ${fmtDate(g.date)} • ${days} din is shop mein</div>
+      </div>
+    </div>
+    <div class="grid grid-2" style="margin-bottom:10px;">
+      <div><b>Outstanding Principal:</b> ${fmtMoney(principal)}</div>
+      <div><b>Interest Rate:</b> ${g.interestRatePct}% / month</div>
+      <div><b>Status:</b> ${g.status}</div>
+      <div><b>Due Date:</b> ${g.dueDate?fmtDate(g.dueDate):'-'}</div>
+    </div>
+    ${g.status==='active'?`<div class="approveBox">Estimated interest due since last entry: <b>${fmtMoney(girviInterestDue(g))}</b></div>`:''}
+    <h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 4px;">Transaction History</h4>
+    <div class="txnList">${(g.transactions||[]).filter(t=>!t.deleted).map(t=>`<div class="txnRow"><span><span class="txType">${t.type}</span> — ${fmtDate(t.date)}${t.note?' • '+t.note:''}</span><span style="display:flex;align-items:center;gap:8px;">${fmtMoney(t.amount)} <button class="btn btn-sm btn-ghost" style="padding:3px 8px;" onclick="deleteGirviTx('${g.id}','${t.id}')">🗑</button></span></div>`).join('') || '<div class="txnRow">No entries yet.</div>'}</div>
+  `;
+  const foot = [{label:'Close', cls:'btn-ghost', onClick:closeModal}];
+  foot.push({label:'✎ Edit Details', cls:'btn-outline', onClick:()=>{ guardEdit('girvi loan for '+g.customerName, ()=>{ closeModal(); openGirviEditForm(g.id); }); }});
+  if(g.status==='active'){
+    foot.push({label:'+ Interest Received', cls:'btn-ghost', onClick:()=>{ closeModal(); openGirviTxForm(g.id,'Interest Received'); }});
+    foot.push({label:'+ Part Payment', cls:'btn-ghost', onClick:()=>{ closeModal(); openGirviTxForm(g.id,'Part Payment'); }});
+    foot.push({label:'+ Additional Loan', cls:'btn-ghost', onClick:()=>{ closeModal(); openGirviTxForm(g.id,'Additional Loan'); }});
+    foot.push({label:'Redeem / Close', cls:'btn-primary', onClick:()=>{ closeModal(); redeemGirvi(g.id); }});
+    foot.push({label:'Forfeit', cls:'btn-danger', onClick:()=>{ closeModal(); forfeitGirvi(g.id); }});
+  }
+  foot.push({label:'🗑 Delete Loan', cls:'btn-danger', onClick:()=>deleteGirvi(g.id)});
+  openModal('Girvi Khata — '+g.customerName, body, foot);
+}
+function recomputeGirviPrincipal(g){
+  let p = 0, lastInterest = g.date;
+  (g.transactions||[]).filter(t=>!t.deleted).forEach(t=>{
+    if(t.type==='Loan Given' || t.type==='Additional Loan') p += t.amount;
+    else if(t.type==='Part Payment') p -= t.amount;
+    else if(t.type==='Interest Received') lastInterest = t.date;
+    else if(t.type==='Redeemed') p = 0;
+  });
+  g.outstandingPrincipal = Math.max(p,0);
+  g.lastInterestDate = lastInterest;
+}
+function deleteGirviTx(girviId, txId){
+  const g = DB.girvi.find(x=>x.id===girviId); if(!g) return;
+  const t = (g.transactions||[]).find(x=>x.id===txId); if(!t) return;
+  if(t.type==='Loan Given'){ toast('Cannot delete the initial loan entry — delete the whole loan record instead if this was a mistake.'); return; }
+  guardDelete('transaction ('+t.type+' — '+fmtMoney(t.amount)+')', ()=>{
+    t.deleted = true;
+    recomputeGirviPrincipal(g);
+    logHistory('Girvi','Transaction Deleted', `${t.type} of ${fmtMoney(t.amount)} removed from ${g.customerName}'s girvi (${g.itemDesc})`);
+    saveDB(); toast('Transaction deleted'); viewGirvi(girviId);
+  });
+}
+function openGirviEditForm(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Item Description</label><input id="egItem" value="${g.itemDesc}"></div>
+      <div class="field"><label>${T('metal')}</label><select id="egMetal"><option ${g.metal==='Silver'?'selected':''}>Silver</option><option ${g.metal==='Gold'?'selected':''}>Gold</option></select></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="egWeight" value="${g.weight}"></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" id="egPurity" value="${g.purity||100}"></div>
+      <div class="field"><label>Interest %/month</label><input type="number" id="egInterest" value="${g.interestRatePct}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Loan Date</label><input type="date" id="egDate" value="${g.date}" max="${todayStr()}"></div>
+      <div class="field"><label>Due Date</label><input type="date" id="egDue" value="${g.dueDate||''}"></div>
+    </div>
+    <p class="helpText" style="margin-top:10px;">To change the loan amount itself, delete the wrong transaction in the ledger and add a correct one — this keeps the ledger accurate.</p>
+  `;
+  openModal('Edit Girvi Details — '+g.customerName, body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Save Changes', cls:'btn-primary', onClick:()=>{
+      g.itemDesc = document.getElementById('egItem').value;
+      g.metal = document.getElementById('egMetal').value;
+      g.weight = parseFloat(document.getElementById('egWeight').value)||0;
+      g.purity = parseFloat(document.getElementById('egPurity').value)||100;
+      g.interestRatePct = parseFloat(document.getElementById('egInterest').value)||0;
+      g.date = document.getElementById('egDate').value || g.date;
+      g.dueDate = document.getElementById('egDue').value || '';
+      if(g.transactions && g.transactions[0] && g.transactions[0].type==='Loan Given') g.transactions[0].date = g.date;
+      logHistory('Girvi','Edited', `Loan details updated for ${g.customerName} (${g.itemDesc})`);
+      saveDB(); closeModal(); toast('Girvi details updated'); renderGirvi();
+    }}
+  ]);
+}
+function deleteGirvi(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  guardDelete('girvi loan for '+g.customerName+' ('+g.itemDesc+')', ()=>{
+    g.deleted = true;
+    logHistory('Girvi','Deleted', `Girvi loan for ${g.customerName} (${g.itemDesc}) deleted`);
+    saveDB(); closeModal(); renderGirvi(); toast('Girvi loan deleted');
+  });
+}
+function openGirviTxForm(id, type){
+  const help = {
+    'Interest Received':'Interest paid by the customer. This does not reduce the principal amount.',
+    'Part Payment':'Amount paid towards the principal. This reduces the outstanding due.',
+    'Additional Loan':'More money given to the customer against the same item. This increases the outstanding due.'
+  }[type] || '';
+  const body = `
+    <p class="helpText" style="margin-top:0;">${help}</p>
+    <div class="grid grid-2">
+      <div class="field"><label>Date</label><input type="date" id="gtxDate" value="${todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>Amount</label><input type="number" id="gtxAmount"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Note</label><input id="gtxNote" placeholder="Optional note"></div>
+  `;
+  openModal(type, body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:T('save'), cls:'btn-primary', onClick:()=>saveGirviTx(id,type)}
+  ]);
+}
+function saveGirviTx(id, type){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const amt = parseFloat(document.getElementById('gtxAmount').value)||0;
+  const date = document.getElementById('gtxDate').value || todayStr();
+  const note = document.getElementById('gtxNote').value || '';
+  if(amt<=0){ toast('Enter a valid amount'); return; }
+  g.transactions = g.transactions || [];
+  g.transactions.push({id:uid('GTX'), date, type, amount:amt, note});
+  const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+  if(type==='Additional Loan') g.outstandingPrincipal = principal + amt;
+  else if(type==='Part Payment') g.outstandingPrincipal = Math.max(principal - amt, 0);
+  else if(type==='Interest Received') g.lastInterestDate = date;
+  logHistory('Girvi', type, `${type} of ${fmtMoney(amt)} for ${g.customerName} (${g.itemDesc})`);
+  saveDB(); closeModal(); toast('Entry saved'); renderGirvi();
+}
+function redeemGirvi(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const bal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+  confirmAction(`Outstanding principal is ${fmtMoney(bal)}. Mark this girvi item (${g.itemDesc}) as fully redeemed by ${g.customerName}? This closes the loan and stays in History.`, ()=>{
+    g.status='redeemed'; g.redeemedDate=todayStr(); g.outstandingPrincipal=0;
+    g.transactions.push({id:uid('GTX'), date:todayStr(), type:'Redeemed', amount:bal, note:'Loan closed / item redeemed'});
+    logHistory('Girvi','Redeemed', `${g.itemDesc} redeemed by ${g.customerName}`);
+    saveDB(); renderGirvi(); toast('Marked as redeemed');
+  });
+}
+function forfeitGirvi(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  askOwnerApproval('Forfeiting means the shop keeps the item permanently since the customer did not repay. This requires owner approval.', ()=>{
+    g.status='forfeited';
+    g.transactions.push({id:uid('GTX'), date:todayStr(), type:'Forfeited', amount:0, note:'Item forfeited to shop'});
+    logHistory('Girvi','Forfeited', `${g.itemDesc} forfeited (customer: ${g.customerName})`);
+    saveDB(); renderGirvi(); toast('Item marked as forfeited');
+  });
+}
+
+/* =====================================================================
+   PAGE: CREDIT / UDHAAR
+===================================================================== */
+function renderCredit(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openCreditForm()">+ Add Entry</button></div>`;
+  html += `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">`;
+  const totalDue = DB.customers.reduce((a,c)=>a+Math.max(customerBalance(c.id),0),0);
+  const customersWithDue = DB.customers.filter(c=>customerBalance(c.id)>0).length;
+  html += `<div class="statCard"><div class="lbl">Total Outstanding</div><div class="val">${fmtMoney(totalDue)}</div></div>`;
+  html += `<div class="statCard"><div class="lbl">Customers with Due</div><div class="val">${customersWithDue}</div></div>`;
+  html += `<div class="statCard"><div class="lbl">Total Customers</div><div class="val">${DB.customers.length}</div></div>`;
+  html += `</div>`;
+  html += `<div class="card"><table><tr><th>Customer</th><th>Phone</th><th>Balance Due</th><th></th></tr>`;
+  const withBal = DB.customers.map(c=>({c,bal:customerBalance(c.id)})).sort((a,b)=>b.bal-a.bal);
+  if(withBal.length===0) html += `<tr><td colspan="4"><div class="empty"><div class="big">📒</div>No customers yet.</div></td></tr>`;
+  withBal.forEach(({c,bal})=>{
+    html += `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View Ledger</button></td></tr>`;
+  });
+  html += `</table></div>`;
+  document.getElementById('content').innerHTML = html;
+}
+function openCreditForm(prefillName){
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>${T('customer')} *</label><input list="custList4" id="crCustomer" value="${prefillName?prefillName:''}">
+      <datalist id="custList4">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>${T('date')} <span class="helpText">(back-date allowed)</span></label><input type="date" id="crDate" value="${todayStr()}" max="${todayStr()}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Entry Type</label><select id="crType"><option value="debit">Udhaar Given (they owe more)</option><option value="credit">Payment Received (reduce due)</option></select></div>
+      <div class="field"><label>Amount</label><input type="number" id="crAmount"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Note</label><input id="crDesc" placeholder="Reason / description"></div>
+  `;
+  openModal('New Credit Entry', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:T('save'), cls:'btn-primary', onClick:saveCredit}
+  ]);
+}
+function saveCredit(){
+  const name = document.getElementById('crCustomer').value.trim();
+  if(!name){ toast('Enter customer name'); return; }
+  const cust = findOrCreateCustomer(name,'');
+  const amt = parseFloat(document.getElementById('crAmount').value)||0;
+  const type = document.getElementById('crType').value;
+  const crDate = document.getElementById('crDate').value || todayStr();
+  DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:crDate, type, amount:amt, description:document.getElementById('crDesc').value||'Manual entry', createdAt:nowISO()});
+  logHistory('Credit','Created', `${type==='debit'?'Udhaar added':'Payment received'} — ${fmtMoney(amt)} (${cust.name})`);
+  saveDB(); closeModal(); toast('Entry saved'); renderCredit();
+}
+
+/* =====================================================================
+   PAGE: INVENTORY
+===================================================================== */
+function renderInventory(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openInvForm()">+ Add Item</button></div>`;
+  html += `<div class="card"><div class="searchBar"><input id="invSearch" placeholder="Search item / code..." oninput="renderInvTable()"></div><div id="invTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderInvTable();
+}
+function renderInvTable(){
+  const q = (document.getElementById('invSearch')?.value||'').toLowerCase();
+  let rows = [...DB.inventory].filter(i=>!i.deleted).sort((a,b)=>b.addedDate.localeCompare(a.addedDate));
+  if(q) rows = rows.filter(i=>i.itemName.toLowerCase().includes(q) || i.code.toLowerCase().includes(q));
+  let html = `<table><tr><th>Code</th><th>Item</th><th>Category</th><th>Wt</th><th>Purity</th><th>Qty</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">💍</div>No inventory items yet.</div></td></tr>`;
+  rows.forEach(i=>{
+    html += `<tr><td>${i.code}</td><td>${i.itemName}</td><td>${i.category}</td><td>${fmtWt(i.weight)}</td><td>${i.purity}</td><td>${i.qty}</td>
+    <td>${i.status==='in-stock'?'<span class="tag tag-green">In Stock</span>':'<span class="tag tag-gray">Sold</span>'}</td>
+    <td>${i.status==='in-stock'?`<button class="btn btn-sm btn-outline" onclick="markSold('${i.id}')">Mark Sold</button>`:''}
+    <button class="btn btn-sm btn-ghost" onclick="guardEdit('inventory item', ()=>openInvForm('${i.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">🗑</button></td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('invTableWrap').innerHTML = html;
+}
+function openInvForm(id){
+  const item = id ? DB.inventory.find(x=>x.id===id) : null;
+  const code = item ? item.code : 'GJ-' + (DB.inventory.length+1001);
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Item Code</label><input id="invCode" value="${code}"></div>
+      <div class="field"><label>Category</label><select id="invCategory">
+        <option ${item&&item.category==='Silver'?'selected':''}>Silver</option>
+        <option ${item&&item.category==='Gold'?'selected':''}>Gold</option>
+        <option ${item&&item.category==='Other'?'selected':''}>Other</option>
+      </select></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Item Name</label><input id="invName" placeholder="e.g. Silver Kada 50g" value="${item?item.itemName:''}"></div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="invWeight" value="${item?item.weight:''}"></div>
+      <div class="field"><label>${T('purity')}</label><input id="invPurity" value="${item?item.purity:''}"></div>
+      <div class="field"><label>Qty</label><input type="number" id="invQty" value="${item?item.qty:1}"></div>
+    </div>
+  `;
+  openModal(item?'Edit Inventory Item':'Add Inventory Item', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:item?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveInv(id)}
+  ]);
+}
+function saveInv(id){
+  const name = document.getElementById('invName').value;
+  if(!name){ toast('Enter item name'); return; }
+  if(id){
+    const item = DB.inventory.find(x=>x.id===id); if(!item) return;
+    item.code=document.getElementById('invCode').value; item.category=document.getElementById('invCategory').value;
+    item.itemName=name; item.weight=parseFloat(document.getElementById('invWeight').value)||0;
+    item.purity=document.getElementById('invPurity').value; item.qty=parseInt(document.getElementById('invQty').value)||1;
+    logHistory('Inventory','Edited', `${item.itemName} (${item.code}) edited`);
+    saveDB(); closeModal(); toast('Item updated'); renderInventory();
+    return;
+  }
+  const item = {
+    id:uid('INV'), code:document.getElementById('invCode').value, category:document.getElementById('invCategory').value,
+    itemName:name, weight:parseFloat(document.getElementById('invWeight').value)||0,
+    purity:document.getElementById('invPurity').value, qty:parseInt(document.getElementById('invQty').value)||1,
+    status:'in-stock', addedDate: todayStr()
+  };
+  DB.inventory.push(item);
+  logHistory('Inventory','Added', `${item.itemName} (${item.code}) added to stock`);
+  saveDB(); closeModal(); toast('Item added'); renderInventory();
+}
+function deleteInv(id){
+  const item = DB.inventory.find(x=>x.id===id); if(!item) return;
+  guardDelete('inventory item ('+item.itemName+')', ()=>{
+    item.deleted = true;
+    logHistory('Inventory','Deleted', `${item.itemName} (${item.code}) deleted`);
+    saveDB(); renderInventory(); toast('Item deleted');
+  });
+}
+function markSold(id){
+  const it = DB.inventory.find(x=>x.id===id); if(!it) return;
+  confirmAction(`Mark "${it.itemName}" as sold?`, ()=>{
+    it.status='sold'; logHistory('Inventory','Sold', it.itemName+' marked sold');
+    saveDB(); renderInventory(); toast('Marked as sold');
+  });
+}
+
+/* =====================================================================
+   PAGE: JOBS (Manufacturing & Repair)
+===================================================================== */
+function renderJobs(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openJobForm()">+ ${T('newJob')}</button></div>`;
+  html += `<div class="pillTabs" id="jobFilterTabs">
+    ${['All','Pending','In Progress','Ready','Delivered'].map(s=>`<div class="pillTab ${s==='All'?'active':''}" data-s="${s}" onclick="setJobFilter(this,'${s}')">${s}</div>`).join('')}
+  </div>`;
+  html += `<div class="card"><div id="jobsTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  window._jobFilter='All';
+  renderJobsTable();
+}
+function setJobFilter(el,s){ document.querySelectorAll('#jobFilterTabs .pillTab').forEach(p=>p.classList.remove('active')); el.classList.add('active'); window._jobFilter=s; renderJobsTable(); }
+function renderJobsTable(){
+  const f = window._jobFilter||'All';
+  const map = {'Pending':'pending','In Progress':'in-progress','Ready':'ready','Delivered':'delivered'};
+  let rows = [...DB.jobs].filter(j=>!j.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(f!=='All') rows = rows.filter(j=>j.status===map[f]);
+  let html = `<table><tr><th>Date</th><th>Customer</th><th>Type</th><th>Item</th><th>Wt In/Out</th><th>Labour</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">🛠️</div>No jobs found.</div></td></tr>`;
+  rows.forEach(j=>{
+    const statusTag = {pending:'tag-gold','in-progress':'tag-gold',ready:'tag-green',delivered:'tag-gray'}[j.status];
+    html += `<tr><td>${fmtDate(j.date)}</td><td>${j.customerName}</td><td>${j.type}</td><td>${j.itemDesc}</td>
+    <td>${fmtWt(j.weightIn)} / ${fmtWt(j.weightOut)}</td><td>${fmtMoney(j.labourCharge)}</td>
+    <td><span class="tag ${statusTag}">${j.status}</span></td>
+    <td><select onchange="updateJobStatus('${j.id}', this.value)">
+      <option value="pending" ${j.status==='pending'?'selected':''}>Pending</option>
+      <option value="in-progress" ${j.status==='in-progress'?'selected':''}>In Progress</option>
+      <option value="ready" ${j.status==='ready'?'selected':''}>Ready</option>
+      <option value="delivered" ${j.status==='delivered'?'selected':''}>Delivered</option>
+    </select>
+    <button class="btn btn-sm btn-ghost" onclick="guardEdit('job', ()=>openJobForm('${j.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteJob('${j.id}')">🗑</button></td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('jobsTableWrap').innerHTML = html;
+}
+function updateJobStatus(id, status){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  j.status = status; if(status==='delivered') j.deliveredDate = todayStr();
+  logHistory('Jobs','Status Updated', `${j.itemDesc} for ${j.customerName} → ${status}`);
+  saveDB(); renderJobsTable(); toast('Status updated');
+}
+function openJobForm(id){
+  const j = id ? DB.jobs.find(x=>x.id===id) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>${T('customer')} *</label><input list="custList5" id="jbCustomer" value="${j?j.customerName:''}">
+      <datalist id="custList5">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>Job Type</label><select id="jbType"><option ${j&&j.type==='Manufacturing'?'selected':''}>Manufacturing</option><option ${j&&j.type==='Repair'?'selected':''}>Repair</option></select></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Item Description</label><input id="jbItem" placeholder="e.g. New silver ring from old chain" value="${j?j.itemDesc:''}"></div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>Weight In (g)</label><input type="number" step="0.001" id="jbWtIn" value="${j?j.weightIn:''}"></div>
+      <div class="field"><label>Expected Weight Out (g)</label><input type="number" step="0.001" id="jbWtOut" value="${j?j.weightOut:''}"></div>
+      <div class="field"><label>Labour Charge</label><input type="number" id="jbLabour" value="${j?j.labourCharge:''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Job Date</label><input type="date" id="jbDate" value="${j?j.date:todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>Expected Delivery Date</label><input type="date" id="jbExpected" value="${j?j.expectedDate||'':''}"></div>
+    </div>
+  `;
+  openModal(j?'Edit Job':T('newJob'), body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:j?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveJob(id)}
+  ]);
+}
+function saveJob(id){
+  const name = document.getElementById('jbCustomer').value.trim();
+  if(!name){ toast('Enter customer name'); return; }
+  const cust = findOrCreateCustomer(name,'');
+  if(id){
+    const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+    j.customerId=cust.id; j.customerName=cust.name; j.type=document.getElementById('jbType').value;
+    j.itemDesc=document.getElementById('jbItem').value; j.weightIn=parseFloat(document.getElementById('jbWtIn').value)||0;
+    j.weightOut=parseFloat(document.getElementById('jbWtOut').value)||0; j.labourCharge=parseFloat(document.getElementById('jbLabour').value)||0;
+    j.date=document.getElementById('jbDate').value||j.date; j.expectedDate=document.getElementById('jbExpected').value||'';
+    logHistory('Jobs','Edited', `${j.type} job for ${cust.name} edited: ${j.itemDesc}`);
+    saveDB(); closeModal(); toast('Job updated'); renderJobs();
+    return;
+  }
+  const j = {
+    id:uid('JOB'), date:document.getElementById('jbDate')?.value||todayStr(), createdAt:nowISO(), customerId:cust.id, customerName:cust.name,
+    type:document.getElementById('jbType').value, itemDesc:document.getElementById('jbItem').value,
+    weightIn:parseFloat(document.getElementById('jbWtIn').value)||0, weightOut:parseFloat(document.getElementById('jbWtOut').value)||0,
+    labourCharge:parseFloat(document.getElementById('jbLabour').value)||0, expectedDate:document.getElementById('jbExpected').value||'',
+    status:'pending'
+  };
+  DB.jobs.push(j);
+  logHistory('Jobs','Created', `${j.type} job for ${cust.name}: ${j.itemDesc}`);
+  saveDB(); closeModal(); toast('Job created'); renderJobs();
+}
+function deleteJob(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  guardDelete('job ('+j.itemDesc+')', ()=>{
+    j.deleted = true;
+    logHistory('Jobs','Deleted', `${j.type} job for ${j.customerName} (${j.itemDesc}) deleted`);
+    saveDB(); renderJobs(); toast('Job deleted');
+  });
+}
+
+/* =====================================================================
+   PAGE: EXCHANGE (old for new)
+===================================================================== */
+function renderExchange(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openExForm()">+ ${T('newExchange')}</button></div>`;
+  html += `<div class="card"><table><tr><th>Date</th><th>Customer</th><th>Old Item</th><th>Old Value</th><th>New Item</th><th>New Value</th><th>Balance</th><th></th></tr>`;
+  let rows=[...DB.exchange].filter(e=>!e.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">🔁</div>No exchanges yet.</div></td></tr>`;
+  rows.forEach(e=> html += `<tr><td>${fmtDate(e.date)}</td><td>${e.customerName}</td><td>${e.oldItemDesc}</td><td>${fmtMoney(e.oldValue)}</td><td>${e.newItemDesc}</td><td>${fmtMoney(e.newValue)}</td><td>${fmtMoney(e.balanceToPay)}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('exchange entry', ()=>openExForm('${e.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteEx('${e.id}')">🗑</button></td></tr>`);
+  html += `</table></div>`;
+  document.getElementById('content').innerHTML = html;
+}
+function openExForm(id){
+  const e = id ? DB.exchange.find(x=>x.id===id) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>${T('customer')} *</label><input list="custList6" id="exCustomer" value="${e?e.customerName:''}">
+      <datalist id="custList6">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>${T('date')}</label><input type="date" id="exDate" value="${e?e.date:todayStr()}" max="${todayStr()}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Old Item Description</label><input id="exOldItem" value="${e?e.oldItemDesc:''}"></div>
+      <div class="field"><label>Old Item Value</label><input type="number" id="exOldVal" value="${e?e.oldValue:''}" oninput="exRecalc()"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>New Item Description</label><input id="exNewItem" value="${e?e.newItemDesc:''}"></div>
+      <div class="field"><label>New Item Value</label><input type="number" id="exNewVal" value="${e?e.newValue:''}" oninput="exRecalc()"></div>
+    </div>
+    <div class="totalsBox"><div class="totalsRow grand"><span>Balance To Pay</span><span id="exBalOut">₹0</span></div></div>
+  `;
+  openModal(e?'Edit Exchange':T('newExchange'), body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:e?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveEx(id)}
+  ]);
+  exRecalc();
+}
+function exRecalc(){
+  const o=parseFloat(document.getElementById('exOldVal').value)||0, n=parseFloat(document.getElementById('exNewVal').value)||0;
+  document.getElementById('exBalOut').textContent = fmtMoney(n-o);
+}
+function saveEx(id){
+  const name=document.getElementById('exCustomer').value.trim();
+  if(!name){ toast('Enter customer name'); return; }
+  const cust = findOrCreateCustomer(name,'');
+  const oldVal=parseFloat(document.getElementById('exOldVal').value)||0, newVal=parseFloat(document.getElementById('exNewVal').value)||0;
+  const exDate = document.getElementById('exDate')?.value || todayStr();
+  if(id){
+    const e = DB.exchange.find(x=>x.id===id); if(!e) return;
+    e.customerId=cust.id; e.customerName=cust.name; e.date=exDate;
+    e.oldItemDesc=document.getElementById('exOldItem').value; e.oldValue=oldVal;
+    e.newItemDesc=document.getElementById('exNewItem').value; e.newValue=newVal; e.balanceToPay=newVal-oldVal;
+    logHistory('Exchange','Edited', `${cust.name}: ${e.oldItemDesc} → ${e.newItemDesc} edited`);
+    saveDB(); closeModal(); toast('Exchange updated'); renderExchange();
+    return;
+  }
+  const e={id:uid('EXC'), date:exDate, createdAt:nowISO(), customerId:cust.id, customerName:cust.name,
+    oldItemDesc:document.getElementById('exOldItem').value, oldValue:oldVal,
+    newItemDesc:document.getElementById('exNewItem').value, newValue:newVal, balanceToPay:newVal-oldVal};
+  DB.exchange.push(e);
+  logHistory('Exchange','Created', `${cust.name}: ${e.oldItemDesc} → ${e.newItemDesc}`);
+  saveDB(); closeModal(); toast('Exchange saved'); renderExchange();
+}
+function deleteEx(id){
+  const e = DB.exchange.find(x=>x.id===id); if(!e) return;
+  guardDelete('exchange entry ('+e.oldItemDesc+' → '+e.newItemDesc+')', ()=>{
+    e.deleted = true;
+    logHistory('Exchange','Deleted', `Exchange for ${e.customerName} deleted`);
+    saveDB(); renderExchange(); toast('Exchange deleted');
+  });
+}
+
+/* =====================================================================
+   PAGE: CUSTOMER LEDGER
+===================================================================== */
+function renderLedger(){
+  let html = `<div class="card"><div class="searchBar"><input id="ledgerSearch" placeholder="Search customer..." oninput="renderLedgerList()"></div><div id="ledgerListWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderLedgerList();
+}
+function renderLedgerList(){
+  const q=(document.getElementById('ledgerSearch')?.value||'').toLowerCase();
+  let rows = [...DB.customers].filter(c=>c.name.toLowerCase().includes(q));
+  let html = `<table><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Sales</th><th>Girvi</th><th></th></tr>`;
+  if(rows.length===0) html+=`<tr><td colspan="6"><div class="empty"><div class="big">👤</div>No customers found.</div></td></tr>`;
+  rows.forEach(c=>{
+    const bal=customerBalance(c.id);
+    html += `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
+    <td>${DB.sales.filter(s=>s.customerId===c.id && !s.deleted).length}</td><td>${DB.girvi.filter(g=>g.customerId===c.id && g.status==='active' && !g.deleted).length}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View</button></td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('ledgerListWrap').innerHTML = html;
+}
+function viewCustomerLedger(id){
+  const c = DB.customers.find(x=>x.id===id); if(!c) return;
+  const sales = DB.sales.filter(s=>s.customerId===id && !s.deleted);
+  const girvi = DB.girvi.filter(g=>g.customerId===id && !g.deleted);
+  const credit = DB.creditEntries.filter(e=>e.customerId===id && !e.deleted);
+  const jobs = DB.jobs.filter(j=>j.customerId===id && !j.deleted);
+  let body = `<div class="grid grid-2" style="margin-bottom:10px;"><div><b>Phone:</b> ${c.phone||'-'}</div><div><b>Balance:</b> ${fmtMoney(customerBalance(id))}</div></div>`;
+  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);">Sales (${sales.length})</h4>`;
+  body += sales.length ? `<table><tr><th>Date</th><th>Bill</th><th>Total</th><th>Balance</th></tr>${sales.map(s=>`<tr><td>${fmtDate(s.date)}</td><td>${s.billNo}</td><td>${fmtMoney(s.grandTotal)}</td><td>${fmtMoney(s.grandTotal-s.amountPaid)}</td></tr>`).join('')}</table>` : `<p class="helpText">No sales yet.</p>`;
+  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:16px;">Girvi Loans (${girvi.length})</h4>`;
+  body += girvi.length ? `<table><tr><th>Item</th><th>Loan</th><th>Status</th></tr>${girvi.map(g=>`<tr><td>${g.itemDesc}</td><td>${fmtMoney(g.loanAmount)}</td><td>${g.status}</td></tr>`).join('')}</table>` : `<p class="helpText">None.</p>`;
+  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:16px;">Credit Entries (${credit.length})</h4>`;
+  body += credit.length ? `<table><tr><th>Date</th><th>Type</th><th>Amount</th><th>Note</th><th></th></tr>${credit.map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.type}</td><td>${fmtMoney(e.amount)}</td><td>${e.description}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('credit entry', ()=>openCreditEditForm('${e.id}','${id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteCreditEntry('${e.id}','${id}')">🗑</button></td></tr>`).join('')}</table>` : `<p class="helpText">None.</p>`;
+  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:16px;">Jobs (${jobs.length})</h4>`;
+  body += jobs.length ? `<table><tr><th>Item</th><th>Type</th><th>Status</th></tr>${jobs.map(j=>`<tr><td>${j.itemDesc}</td><td>${j.type}</td><td>${j.status}</td></tr>`).join('')}</table>` : `<p class="helpText">None.</p>`;
+  openModal(c.name+' — Ledger', body, [
+    {label:'Close', cls:'btn-ghost', onClick:closeModal},
+    {label:'+ Add Credit Entry', cls:'btn-outline', onClick:()=>{ closeModal(); openCreditForm(c.name); }}
+  ]);
+}
+function openCreditEditForm(entryId, custId){
+  const e = DB.creditEntries.find(x=>x.id===entryId); if(!e) return;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Entry Type</label><select id="ceType"><option value="debit" ${e.type==='debit'?'selected':''}>Udhaar Given (they owe more)</option><option value="credit" ${e.type==='credit'?'selected':''}>Payment Received (reduce due)</option></select></div>
+      <div class="field"><label>Amount</label><input type="number" id="ceAmount" value="${e.amount}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Date</label><input type="date" id="ceDate" value="${e.date}" max="${todayStr()}"></div>
+    <div class="field" style="margin-top:12px;"><label>Note</label><input id="ceDesc" value="${e.description||''}"></div>
+  `;
+  openModal('Edit Credit Entry', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Save Changes', cls:'btn-primary', onClick:()=>{
+      e.type = document.getElementById('ceType').value;
+      e.amount = parseFloat(document.getElementById('ceAmount').value)||0;
+      e.date = document.getElementById('ceDate').value || e.date;
+      e.description = document.getElementById('ceDesc').value;
+      logHistory('Credit','Edited', `Credit entry edited for ${e.description} — ${fmtMoney(e.amount)}`);
+      saveDB(); closeModal(); toast('Entry updated'); viewCustomerLedger(custId);
+    }}
+  ]);
+}
+function deleteCreditEntry(entryId, custId){
+  const e = DB.creditEntries.find(x=>x.id===entryId); if(!e) return;
+  guardDelete('credit entry ('+fmtMoney(e.amount)+')', ()=>{
+    e.deleted = true;
+    logHistory('Credit','Deleted', `Credit entry of ${fmtMoney(e.amount)} deleted`);
+    saveDB(); toast('Entry deleted'); viewCustomerLedger(custId);
+  });
+}
+
+/* =====================================================================
+   PAGE: HISTORY
+===================================================================== */
+function renderHistory(){
+  let html = `<div class="card"><div class="searchBar"><input id="histSearch" placeholder="Search history..." oninput="renderHistTable()"></div><div id="histTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderHistTable();
+}
+function renderHistTable(){
+  const q=(document.getElementById('histSearch')?.value||'').toLowerCase();
+  let rows = DB.history.filter(h=> !q || h.description.toLowerCase().includes(q) || h.module.toLowerCase().includes(q));
+  let html = `<table><tr><th>Time</th><th>Module</th><th>Action</th><th>Description</th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="4"><div class="empty"><div class="big">🕘</div>No history recorded yet.</div></td></tr>`;
+  rows.slice(0,300).forEach(h=> html += `<tr><td>${new Date(h.ts).toLocaleString('en-IN')}</td><td>${h.module}</td><td>${h.action}</td><td>${h.description}</td></tr>`);
+  html += `</table>`;
+  document.getElementById('histTableWrap').innerHTML = html;
+}
+
+/* =====================================================================
+   PAGE: REPORTS
+===================================================================== */
+function renderReports(){
+  const today = todayStr();
+  const weekAgo = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const monthAgo = new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+  const sumSales = (from) => DB.sales.filter(s=>!s.void && !s.deleted && s.date>=from).reduce((a,s)=>a+s.grandTotal,0);
+  const sumBuy = (from) => DB.buying.filter(b=>b.date>=from && !b.deleted).reduce((a,b)=>a+b.amount,0);
+  let html = `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="statCard"><div class="lbl">Sales — Today</div><div class="val">${fmtMoney(sumSales(today))}</div></div>
+    <div class="statCard"><div class="lbl">Sales — 7 Days</div><div class="val">${fmtMoney(sumSales(weekAgo))}</div></div>
+    <div class="statCard"><div class="lbl">Sales — 30 Days</div><div class="val">${fmtMoney(sumSales(monthAgo))}</div></div>
+    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Buying — Today</div><div class="val">${fmtMoney(sumBuy(today))}</div></div>
+    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Buying — 7 Days</div><div class="val">${fmtMoney(sumBuy(weekAgo))}</div></div>
+    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Buying — 30 Days</div><div class="val">${fmtMoney(sumBuy(monthAgo))}</div></div>
+  </div>`;
+  html += `<div class="grid grid-2">`;
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Outstanding Summary</h3>
+    <table><tr><td>Total Credit Due</td><td>${fmtMoney(DB.customers.reduce((a,c)=>a+Math.max(customerBalance(c.id),0),0))}</td></tr>
+    <tr><td>Active Girvi Loans</td><td>${fmtMoney(DB.girvi.filter(g=>g.status==='active' && !g.deleted).reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0))}</td></tr>
+    <tr><td>Pending Jobs</td><td>${DB.jobs.filter(j=>j.status!=='delivered' && !j.deleted).length}</td></tr>
+    <tr><td>Items In Stock</td><td>${DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted).length}</td></tr></table></div>`;
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Expenses (30 Days)</h3>
+    <table>${DB.expenses.filter(e=>e.date>=monthAgo && !e.deleted).map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.category}</td><td>${fmtMoney(e.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="helpText">No expenses logged.</td></tr>'}</table></div>`;
+  html += `</div>`;
+  document.getElementById('content').innerHTML = html;
+}
+
+/* =====================================================================
+   PAGE: CASH DAY CLOSE
+===================================================================== */
+function renderCashday(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openCashForm()">+ Close Today</button></div>`;
+  html += `<div class="card"><table><tr><th>Date</th><th>Opening</th><th>Cash In</th><th>Cash Out</th><th>Closing</th><th>Closed By</th><th></th></tr>`;
+  let rows=[...DB.cashDays].filter(c=>!c.deleted).sort((a,b)=>b.date.localeCompare(a.date));
+  if(rows.length===0) html+=`<tr><td colspan="7"><div class="empty"><div class="big">💰</div>No day-close records yet.</div></td></tr>`;
+  rows.forEach(c=> html+=`<tr><td>${fmtDate(c.date)}</td><td>${fmtMoney(c.openingCash)}</td><td>${fmtMoney(c.cashIn)}</td><td>${fmtMoney(c.cashOut)}</td><td>${fmtMoney(c.closingCash)}</td><td>${c.closedBy}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('day close entry', ()=>openCashForm('${c.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteCashDay('${c.id}')">🗑</button></td></tr>`);
+  html+=`</table></div>`;
+  document.getElementById('content').innerHTML = html;
+}
+function openCashForm(id){
+  const c = id ? DB.cashDays.find(x=>x.id===id) : null;
+  const body = `<div class="grid grid-2">
+    <div class="field"><label>Date</label><input type="date" id="cdDate" value="${c?c.date:todayStr()}" max="${todayStr()}"></div>
+    <div class="field"><label>Closed By</label><input id="cdBy" value="${c?c.closedBy:'Owner'}"></div>
+    <div class="field"><label>Opening Cash</label><input type="number" id="cdOpen" value="${c?c.openingCash:''}"></div>
+    <div class="field"><label>Cash In</label><input type="number" id="cdIn" value="${c?c.cashIn:''}"></div>
+    <div class="field"><label>Cash Out</label><input type="number" id="cdOut" value="${c?c.cashOut:''}"></div>
+  </div>`;
+  openModal(c?'Edit Day Close':'Day Close', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:c?'Save Changes':'Close Day', cls:'btn-primary', onClick:()=>{
+      const open=parseFloat(document.getElementById('cdOpen').value)||0, cin=parseFloat(document.getElementById('cdIn').value)||0, cout=parseFloat(document.getElementById('cdOut').value)||0;
+      const date = document.getElementById('cdDate').value || todayStr();
+      if(c){
+        c.date=date; c.openingCash=open; c.cashIn=cin; c.cashOut=cout; c.closingCash=open+cin-cout; c.closedBy=document.getElementById('cdBy').value||'Owner';
+        logHistory('CashDay','Edited', 'Day close for '+date+' edited — closing cash '+fmtMoney(c.closingCash));
+        saveDB(); closeModal(); renderCashday(); toast('Day close updated');
+        return;
+      }
+      DB.cashDays.push({id:uid('CD'), date, openingCash:open, cashIn:cin, cashOut:cout, closingCash:open+cin-cout, closedBy:document.getElementById('cdBy').value||'Owner'});
+      logHistory('CashDay','Closed', 'Day closed with closing cash '+fmtMoney(open+cin-cout));
+      saveDB(); closeModal(); renderCashday(); toast('Day closed');
+    }}
+  ]);
+}
+function deleteCashDay(id){
+  const c = DB.cashDays.find(x=>x.id===id); if(!c) return;
+  guardDelete('day close record ('+fmtDate(c.date)+')', ()=>{
+    c.deleted = true;
+    logHistory('CashDay','Deleted', 'Day close for '+c.date+' deleted');
+    saveDB(); renderCashday(); toast('Record deleted');
+  });
+}
+
+/* =====================================================================
+   PAGE: EXPENSES
+===================================================================== */
+function renderExpenses(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openExpForm()">+ Add Expense</button></div>`;
+  html += `<div class="card"><table><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr>`;
+  let rows=[...DB.expenses].filter(e=>!e.deleted).sort((a,b)=>b.date.localeCompare(a.date));
+  if(rows.length===0) html+=`<tr><td colspan="5"><div class="empty"><div class="big">🧮</div>No expenses logged yet.</div></td></tr>`;
+  rows.forEach(e=>html+=`<tr><td>${fmtDate(e.date)}</td><td>${e.category}</td><td>${e.description}</td><td>${fmtMoney(e.amount)}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('expense entry', ()=>openExpForm('${e.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">🗑</button></td></tr>`);
+  html+=`</table></div>`;
+  document.getElementById('content').innerHTML = html;
+}
+function openExpForm(id){
+  const e = id ? DB.expenses.find(x=>x.id===id) : null;
+  const body = `<div class="grid grid-2">
+    <div class="field"><label>Category</label><select id="expCat">
+      <option ${e&&e.category==='Rent'?'selected':''}>Rent</option><option ${e&&e.category==='Electricity'?'selected':''}>Electricity</option>
+      <option ${e&&e.category==='Salary'?'selected':''}>Salary</option><option ${e&&e.category==='Transport'?'selected':''}>Transport</option>
+      <option ${e&&e.category==='Other'?'selected':''}>Other</option></select></div>
+    <div class="field"><label>Amount</label><input type="number" id="expAmt" value="${e?e.amount:''}"></div>
+  </div>
+  <div class="field" style="margin-top:12px;"><label>Date</label><input type="date" id="expDate" value="${e?e.date:todayStr()}" max="${todayStr()}"></div>
+  <div class="field" style="margin-top:12px;"><label>Description</label><input id="expDesc" value="${e?e.description||'':''}"></div>`;
+  openModal(e?'Edit Expense':'Add Expense', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:e?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>{
+      const amt = parseFloat(document.getElementById('expAmt').value)||0;
+      const cat = document.getElementById('expCat').value;
+      const date = document.getElementById('expDate').value || todayStr();
+      const desc = document.getElementById('expDesc').value;
+      if(e){
+        e.category=cat; e.amount=amt; e.date=date; e.description=desc;
+        logHistory('Expenses','Edited', cat+' entry edited — '+fmtMoney(amt));
+        saveDB(); closeModal(); renderExpenses(); toast('Expense updated');
+        return;
+      }
+      DB.expenses.push({id:uid('EXP'), date, category:cat, description:desc, amount:amt});
+      logHistory('Expenses','Added', cat+' — '+fmtMoney(amt));
+      saveDB(); closeModal(); renderExpenses(); toast('Expense added');
+    }}
+  ]);
+}
+function deleteExpense(id){
+  const e = DB.expenses.find(x=>x.id===id); if(!e) return;
+  guardDelete('expense entry ('+e.category+')', ()=>{
+    e.deleted = true;
+    logHistory('Expenses','Deleted', e.category+' entry of '+fmtMoney(e.amount)+' deleted');
+    saveDB(); renderExpenses(); toast('Expense deleted');
+  });
+}
+
+/* =====================================================================
+   PAGE: WHOLESALER KHATA — separate ledger per supplier (e.g. Hiraraja
+   Jamnalal), tracking purity, silver/gold owed and labour charges.
+===================================================================== */
+function wholesalerBalance(wholesalerId){
+  let silverOwed=0, goldOwed=0, cashOwed=0;
+  DB.wholesalerEntries.filter(e=>e.wholesalerId===wholesalerId && !e.deleted).forEach(e=>{
+    if(e.type==='purchase'){
+      if(e.metal==='Gold') goldOwed += e.pureWeight; else silverOwed += e.pureWeight;
+      cashOwed += Number(e.labourCharge||0);
+    } else {
+      if(e.metal==='Gold') goldOwed -= e.pureWeight; else silverOwed -= e.pureWeight;
+      cashOwed -= Number(e.cashPaid||0);
+    }
+  });
+  return {silverOwed, goldOwed, cashOwed};
+}
+function renderWholesaler(){
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openWholesalerForm()">+ Add Wholesaler</button></div>`;
+  const activeWholesalers = DB.wholesalers.filter(w=>!w.deleted);
+  if(activeWholesalers.length===0){
+    html += `<div class="card"><div class="empty"><div class="big">📇</div>No wholesalers added yet. Add Hiraraja Jamnalal or your other suppliers to start their kata.</div></div>`;
+  } else {
+    const totals = activeWholesalers.reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,cash:0});
+    html += `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="statCard"><div class="lbl">Total Wholesalers</div><div class="val">${activeWholesalers.length}</div></div>
+      <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Total Silver Owed</div><div class="val">${fmtWt(totals.silver)}</div></div>
+      <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Total Cash/Labour Owed</div><div class="val">${fmtMoney(totals.cash)}</div></div>
+    </div>`;
+    html += `<div class="grid grid-3">`;
+    activeWholesalers.forEach(w=>{
+      const bal = wholesalerBalance(w.id);
+      html += `<div class="wsCard">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div class="wsName">${w.name}</div>
+          <div>
+            <button class="btn btn-sm btn-ghost" onclick="guardEdit('wholesaler', ()=>openWholesalerForm('${w.id}'))">✎</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteWholesaler('${w.id}')">🗑</button>
+          </div>
+        </div>
+        <div class="helpText">${w.phone||''}</div>
+        <div class="wsBalRow"><span>Silver: <b>${fmtWt(bal.silverOwed)}</b></span></div>
+        <div class="wsBalRow"><span>Gold: <b>${fmtWt(bal.goldOwed)}</b></span><span>Cash/Labour: <b>${fmtMoney(bal.cashOwed)}</b></span></div>
+        <button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="viewWholesalerKata('${w.id}')">Open Kata</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  document.getElementById('content').innerHTML = html;
+}
+function openWholesalerForm(id){
+  const w = id ? DB.wholesalers.find(x=>x.id===id) : null;
+  const body = `
+    <div class="field"><label>Wholesaler Name *</label><input id="whName" placeholder="e.g. Hiraraja Jamnalal" value="${w?w.name:''}"></div>
+    <div class="field" style="margin-top:12px;"><label>Phone</label><input id="whPhone" value="${w?w.phone||'':''}"></div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="whNotes" placeholder="Optional" value="${w?w.notes||'':''}"></div>
+  `;
+  openModal(w?'Edit Wholesaler':'Add Wholesaler', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:w?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>{
+      const name = document.getElementById('whName').value.trim();
+      if(!name){ toast('Enter wholesaler name'); return; }
+      if(w){
+        w.name=name; w.phone=document.getElementById('whPhone').value; w.notes=document.getElementById('whNotes').value;
+        logHistory('Wholesaler','Edited', name+' details updated');
+        saveDB(); closeModal(); renderWholesaler(); toast('Wholesaler updated');
+        return;
+      }
+      DB.wholesalers.push({id:uid('WHS'), name, phone:document.getElementById('whPhone').value, notes:document.getElementById('whNotes').value, createdAt:nowISO()});
+      logHistory('Wholesaler','Added', name+' added as wholesaler');
+      saveDB(); closeModal(); renderWholesaler(); toast('Wholesaler added');
+    }}
+  ]);
+}
+function deleteWholesaler(id){
+  const w = DB.wholesalers.find(x=>x.id===id); if(!w) return;
+  guardDelete('wholesaler ('+w.name+') and its whole kata', ()=>{
+    w.deleted = true;
+    logHistory('Wholesaler','Deleted', w.name+' deleted');
+    saveDB(); renderWholesaler(); toast('Wholesaler deleted');
+  });
+}
+function viewWholesalerKata(id){
+  const w = DB.wholesalers.find(x=>x.id===id); if(!w) return;
+  const entries = DB.wholesalerEntries.filter(e=>e.wholesalerId===id && !e.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const bal = wholesalerBalance(id);
+  let body = `<div class="grid grid-2" style="margin-bottom:12px;">
+    <div><b>Silver Owed:</b> ${fmtWt(bal.silverOwed)}</div><div><b>Gold Owed:</b> ${fmtWt(bal.goldOwed)}</div>
+    <div><b>Cash/Labour Owed:</b> ${fmtMoney(bal.cashOwed)}</div><div><b>Phone:</b> ${w.phone||'-'}</div>
+  </div>
+  <table><tr><th>Date</th><th>Type</th><th>Item</th><th>Purity</th><th>Wt</th><th>Pure Wt</th><th>Labour</th><th>Cash Paid</th><th></th></tr>
+  ${entries.map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.type}</td><td>${e.itemDesc||'-'}</td><td>${e.purity||100}%</td><td>${fmtWt(e.weight||0)}</td><td>${fmtWt(e.pureWeight||0)}</td><td>${fmtMoney(e.labourCharge||0)}</td><td>${fmtMoney(e.cashPaid||0)}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('wholesaler entry', ()=>openWholesalerEntryForm('${id}','${e.type}','${e.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteWholesalerEntry('${id}','${e.id}')">🗑</button></td></tr>`).join('') || '<tr><td colspan="9" class="helpText">No entries yet.</td></tr>'}
+  </table>`;
+  openModal(w.name+' — Kata', body, [
+    {label:'Close', cls:'btn-ghost', onClick:closeModal},
+    {label:'+ Purchase Entry', cls:'btn-outline', onClick:()=>{ closeModal(); openWholesalerEntryForm(id,'purchase'); }},
+    {label:'+ Payment Entry', cls:'btn-primary', onClick:()=>{ closeModal(); openWholesalerEntryForm(id,'payment'); }}
+  ]);
+}
+function openWholesalerEntryForm(wholesalerId, type, editId){
+  const isPurchase = type==='purchase';
+  const e = editId ? DB.wholesalerEntries.find(x=>x.id===editId) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Date</label><input type="date" id="weDate" value="${e?e.date:todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>${T('metal')}</label><select id="weMetal"><option ${e&&e.metal==='Silver'?'selected':''}>Silver</option><option ${e&&e.metal==='Gold'?'selected':''}>Gold</option></select></div>
+    </div>
+    ${isPurchase?`<div class="field" style="margin-top:12px;"><label>Item Description</label><input id="weItem" placeholder="e.g. Raw silver bars" value="${e?e.itemDesc||'':''}"></div>`:''}
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>${T('purity')} %</label><input type="number" id="wePurity" value="${e?e.purity:100}" oninput="weRecalc()"></div>
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="weWeight" value="${e?e.weight:''}" oninput="weRecalc()"></div>
+      <div class="field"><label>Pure Weight</label><input type="text" id="wePureOut" disabled></div>
+    </div>
+    ${isPurchase?`<div class="field" style="margin-top:12px;"><label>Labour Charge (₹, cash owed)</label><input type="number" id="weLabour" value="${e?e.labourCharge||'':''}"></div>`
+      :`<div class="field" style="margin-top:12px;"><label>Cash Paid (₹, reduces due)</label><input type="number" id="weCashPaid" value="${e?e.cashPaid||'':''}"></div>`}
+    <div class="field" style="margin-top:12px;"><label>Note</label><input id="weNote" value="${e?e.note||'':''}"></div>
+  `;
+  openModal((e?'Edit ':'')+(isPurchase?'Wholesaler Purchase Entry':'Wholesaler Payment Entry'), body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:e?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveWholesalerEntry(wholesalerId,type,editId)}
+  ]);
+  weRecalc();
+}
+function weRecalc(){
+  const w = parseFloat(document.getElementById('weWeight')?.value)||0;
+  const p = parseFloat(document.getElementById('wePurity')?.value);
+  const pf = isNaN(p)?1:(p/100);
+  const out = document.getElementById('wePureOut');
+  if(out) out.value = fmtWt(w*pf);
+}
+function saveWholesalerEntry(wholesalerId, type, editId){
+  const weight = parseFloat(document.getElementById('weWeight').value)||0;
+  const purity = parseFloat(document.getElementById('wePurity').value);
+  const pf = isNaN(purity)?1:(purity/100);
+  const w = DB.wholesalers.find(x=>x.id===wholesalerId);
+  if(editId){
+    const e = DB.wholesalerEntries.find(x=>x.id===editId); if(!e) return;
+    e.date = document.getElementById('weDate').value||e.date; e.metal = document.getElementById('weMetal').value;
+    e.purity = isNaN(purity)?100:purity; e.weight = weight; e.pureWeight = weight*pf;
+    e.itemDesc = type==='purchase' ? (document.getElementById('weItem')?.value||'') : e.itemDesc;
+    e.labourCharge = type==='purchase' ? (parseFloat(document.getElementById('weLabour')?.value)||0) : 0;
+    e.cashPaid = type==='payment' ? (parseFloat(document.getElementById('weCashPaid')?.value)||0) : 0;
+    e.note = document.getElementById('weNote').value||'';
+    logHistory('Wholesaler', type+' Edited', `${type} entry for ${w?w.name:''} edited — ${fmtWt(e.pureWeight)}`);
+    saveDB(); closeModal(); toast('Entry updated'); renderWholesaler();
+    return;
+  }
+  const e = {
+    id: uid('WE'), wholesalerId, date: document.getElementById('weDate').value||todayStr(), createdAt: nowISO(),
+    type, metal: document.getElementById('weMetal').value, purity: isNaN(purity)?100:purity,
+    weight, pureWeight: weight*pf,
+    itemDesc: type==='purchase' ? (document.getElementById('weItem')?.value||'') : '',
+    labourCharge: type==='purchase' ? (parseFloat(document.getElementById('weLabour')?.value)||0) : 0,
+    cashPaid: type==='payment' ? (parseFloat(document.getElementById('weCashPaid')?.value)||0) : 0,
+    note: document.getElementById('weNote').value||''
+  };
+  DB.wholesalerEntries.push(e);
+  logHistory('Wholesaler', type, `${type} entry for ${w?w.name:''} — ${fmtWt(e.pureWeight)}`);
+  saveDB(); closeModal(); toast('Entry saved'); renderWholesaler();
+}
+function deleteWholesalerEntry(wholesalerId, entryId){
+  const e = DB.wholesalerEntries.find(x=>x.id===entryId); if(!e) return;
+  guardDelete('wholesaler entry ('+e.type+')', ()=>{
+    e.deleted = true;
+    logHistory('Wholesaler','Entry Deleted', `${e.type} entry deleted`);
+    saveDB(); toast('Entry deleted'); viewWholesalerKata(wholesalerId);
+  });
+}
+
+/* =====================================================================
+   PAGE: CALCULATOR — a standard calculator plus a dedicated jewellery
+   rate calculator (weight × purity% × rate + making).
+===================================================================== */
+let calcExpr='';
+function renderCalculator(){
+  let html = `<div class="pillTabs">
+    <div class="pillTab active" data-t="std" onclick="setCalcTab(this,'std')">Standard Calculator</div>
+    <div class="pillTab" data-t="jewel" onclick="setCalcTab(this,'jewel')">Jewellery Rate Calculator</div>
+  </div>
+  <div id="calcStdWrap" class="card" style="max-width:420px;"></div>
+  <div id="calcJewelWrap" class="card hidden" style="max-width:520px;"></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderStdCalc(); renderJewelCalc();
+}
+function setCalcTab(el, t){
+  document.querySelectorAll('#content .pillTab').forEach(p=>p.classList.remove('active')); el.classList.add('active');
+  document.getElementById('calcStdWrap').classList.toggle('hidden', t!=='std');
+  document.getElementById('calcJewelWrap').classList.toggle('hidden', t!=='jewel');
+}
+function renderStdCalc(){
+  const wrap = document.getElementById('calcStdWrap');
+  wrap.innerHTML = `
+    <div class="calcScreen"><div class="expr" id="calcExprOut">&nbsp;</div><div class="val" id="calcValOut">0</div></div>
+    <div class="calcGrid">
+      <button class="calcBtn clear" onclick="calcPress('C')">C</button>
+      <button class="calcBtn clear" onclick="calcPress('BACK')">⌫</button>
+      <button class="calcBtn op" onclick="calcPress('%')">%</button>
+      <button class="calcBtn op" onclick="calcPress('/')">÷</button>
+      <button class="calcBtn" onclick="calcPress('7')">7</button>
+      <button class="calcBtn" onclick="calcPress('8')">8</button>
+      <button class="calcBtn" onclick="calcPress('9')">9</button>
+      <button class="calcBtn op" onclick="calcPress('*')">×</button>
+      <button class="calcBtn" onclick="calcPress('4')">4</button>
+      <button class="calcBtn" onclick="calcPress('5')">5</button>
+      <button class="calcBtn" onclick="calcPress('6')">6</button>
+      <button class="calcBtn op" onclick="calcPress('-')">−</button>
+      <button class="calcBtn" onclick="calcPress('1')">1</button>
+      <button class="calcBtn" onclick="calcPress('2')">2</button>
+      <button class="calcBtn" onclick="calcPress('3')">3</button>
+      <button class="calcBtn op" onclick="calcPress('+')">+</button>
+      <button class="calcBtn" onclick="calcPress('0')">0</button>
+      <button class="calcBtn" onclick="calcPress('.')">.</button>
+      <button class="calcBtn eq" onclick="calcPress('=')">=</button>
+    </div>`;
+  updateCalcDisplay();
+}
+function calcPress(k){
+  if(k==='C'){ calcExpr=''; }
+  else if(k==='BACK'){ calcExpr = calcExpr.slice(0,-1); }
+  else if(k==='='){
+    try{
+      if(!/^[0-9+\-*/.% ]+$/.test(calcExpr)) throw new Error('invalid');
+      const result = Function('"use strict";return ('+calcExpr.replace(/%/g,'/100')+')')();
+      calcExpr = String(Math.round(result*100)/100);
+    }catch(e){ calcExpr='Error'; }
+  } else { calcExpr += k; }
+  updateCalcDisplay();
+}
+function updateCalcDisplay(){
+  const v=document.getElementById('calcValOut'); const e=document.getElementById('calcExprOut');
+  if(v) v.textContent = calcExpr || '0';
+}
+function renderJewelCalc(){
+  const wrap = document.getElementById('calcJewelWrap');
+  wrap.innerHTML = `
+    <p class="helpText" style="margin-top:0;">Same formula used across Sales, Buying and Girvi: weight × purity% = pure weight, then pure weight × rate + making = total.</p>
+    <div class="grid grid-2">
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="jcWeight" oninput="jcRecalc()"></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" id="jcPurity" value="100" oninput="jcRecalc()"></div>
+      <div class="field"><label>${T('rate')} (per gram)</label><input type="number" id="jcRate" oninput="jcRecalc()"></div>
+      <div class="field"><label>${T('making')} (₹)</label><input type="number" id="jcMaking" value="0" oninput="jcRecalc()"></div>
+    </div>
+    <div class="totalsBox" id="jcOut"></div>
+  `;
+  jcRecalc();
+}
+function jcRecalc(){
+  const w=parseFloat(document.getElementById('jcWeight')?.value)||0;
+  const p=parseFloat(document.getElementById('jcPurity')?.value); const pf=isNaN(p)?1:(p/100);
+  const r=parseFloat(document.getElementById('jcRate')?.value)||0;
+  const m=parseFloat(document.getElementById('jcMaking')?.value)||0;
+  const pureWt = w*pf; const amount = pureWt*r+m;
+  const out = document.getElementById('jcOut');
+  if(out) out.innerHTML = `
+    <div class="totalsRow"><span>Pure Weight</span><span>${fmtWt(pureWt)}</span></div>
+    <div class="totalsRow"><span>Metal Value</span><span>${fmtMoney(pureWt*r)}</span></div>
+    <div class="totalsRow"><span>${T('making')}</span><span>${fmtMoney(m)}</span></div>
+    <div class="totalsRow grand"><span>Total</span><span>${fmtMoney(amount)}</span></div>`;
+}
+
+/* =====================================================================
+   PAGE: SETTINGS
+===================================================================== */
+function renderSettings(){
+  let html = `<div class="grid grid-2">
+    <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Shop Info</h3>
+      <div class="field" style="margin-bottom:10px;"><label>Shop Name</label><input id="setShopName" value="${DB.meta.shopName}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>Location</label><input id="setLocation" value="${DB.meta.location}"></div>
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="saveShopInfo()">Save</button>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Rate Setup</h3>
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="field"><label>Gold 24K (per 10g)</label><input type="number" id="setGold24" value="${DB.currentRates.gold24}"></div>
+        <div class="field"><label>Gold 22K (per 10g)</label><input type="number" id="setGold22" value="${DB.currentRates.gold22}"></div>
+        <div class="field"><label>Silver (per kg)</label><input type="number" id="setSilverKg" value="${DB.currentRates.silverKg}"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveRates()">Update Rates</button>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Security</h3>
+      <div class="field" style="margin-bottom:10px;"><label>Shop PIN</label><input id="setPin" maxlength="6" value="${DB.meta.pin}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>Owner Approval PIN</label><input id="setOwnerPin" maxlength="6" value="${DB.meta.ownerPin}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>Discount Approval Threshold (%)</label><input type="number" id="setThreshold" value="${DB.meta.discountApprovalThresholdPct}"></div>
+      <button class="btn btn-primary" onclick="saveSecurity()">Save</button>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Staff & Roles</h3>
+      <table><tr><th>Name</th><th>Role</th></tr>${DB.staff.map(s=>`<tr><td>${s.name}</td><td>${s.role}</td></tr>`).join('')}</table>
+      <div class="grid grid-2" style="margin-top:10px;">
+        <div class="field"><input id="newStaffName" placeholder="Staff name"></div>
+        <div class="field"><select id="newStaffRole"><option>Manager</option><option>Staff</option><option>Karigar</option></select></div>
+      </div>
+      <button class="btn btn-outline" style="margin-top:10px;" onclick="addStaff()">+ Add Staff</button>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Backup & Restore</h3>
+      <p class="helpText">Backups are saved as a JSON file. Keep a copy safe (e.g. share to your phone) in case this tablet is lost or reset.</p>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="doBackup()">⬇ Download Backup</button>
+        <button class="btn btn-outline" onclick="document.getElementById('restoreFileInput').click()">⬆ Restore from File</button>
+      </div>
+      <div class="helpText" style="margin-top:8px;">Last backup: ${DB.meta.lastBackupAt?fmtDate(DB.meta.lastBackupAt):'Never'}</div>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Language</h3>
+      <div style="display:flex;gap:10px;">
+        <button class="btn ${DB.meta.language==='en'?'btn-primary':'btn-ghost'}" onclick="setLanguage('en')">English</button>
+        <button class="btn ${DB.meta.language==='hi'?'btn-primary':'btn-ghost'}" onclick="setLanguage('hi')">हिंदी</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('content').innerHTML = html;
+}
+function saveShopInfo(){
+  DB.meta.shopName = document.getElementById('setShopName').value;
+  DB.meta.location = document.getElementById('setLocation').value;
+  document.getElementById('brandName').textContent = DB.meta.shopName;
+  document.getElementById('brandLoc').textContent = DB.meta.location.toUpperCase();
+  document.getElementById('lockTitle').textContent = DB.meta.shopName;
+  saveDB(); toast('Shop info saved');
+}
+function saveRates(){
+  DB.currentRates = {
+    gold24: parseFloat(document.getElementById('setGold24').value)||0,
+    gold22: parseFloat(document.getElementById('setGold22').value)||0,
+    silverKg: parseFloat(document.getElementById('setSilverKg').value)||0,
+    updatedAt: nowISO()
+  };
+  DB.rateHistory.push({...DB.currentRates});
+  logHistory('Rates','Updated', `Gold24: ${DB.currentRates.gold24}, Gold22: ${DB.currentRates.gold22}, Silver/kg: ${DB.currentRates.silverKg}`);
+  saveDB(); toast('Rates updated');
+}
+function saveSecurity(){
+  DB.meta.pin = document.getElementById('setPin').value||DB.meta.pin;
+  DB.meta.ownerPin = document.getElementById('setOwnerPin').value||DB.meta.ownerPin;
+  DB.meta.discountApprovalThresholdPct = parseFloat(document.getElementById('setThreshold').value)||3;
+  saveDB(); toast('Security settings saved');
+}
+function addStaff(){
+  const name = document.getElementById('newStaffName').value.trim();
+  if(!name){ toast('Enter staff name'); return; }
+  DB.staff.push({id:uid('STF'), name, role:document.getElementById('newStaffRole').value, pin:'0000'});
+  logHistory('Staff','Added', name+' added as '+document.getElementById('newStaffRole').value);
+  saveDB(); renderSettings(); toast('Staff added');
+}
+function doBackup(){
+  DB.meta.lastBackupAt = nowISO(); saveDB();
+  const blob = new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download = 'gayatri-jewellers-backup-'+todayStr()+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  logHistory('Backup','Created','Backup file downloaded');
+  toast('Backup downloaded');
+}
+document.getElementById('restoreFileInput').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const data = JSON.parse(evt.target.result);
+      confirmAction('Restoring will replace ALL current data on this tablet with the backup file. Continue?', ()=>{
+        DB = data; saveDB(); location.reload();
+      });
+    }catch(err){ toast('Invalid backup file'); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+function setLanguage(l){ DB.meta.language=l; saveDB(); renderNav(); goTo(currentPage); toast(l==='hi'?'भाषा बदली गई':'Language changed'); }
+
+/* =====================================================================
+   PIN LOCK LOGIC
+===================================================================== */
+let pinBuffer='';
+function renderPinPad(){
+  const grid = document.getElementById('padGrid'); grid.innerHTML='';
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  keys.forEach(k=>{
+    const b = document.createElement('button');
+    b.className='padBtn'+(k===''?' hidden':''); b.textContent=k;
+    if(k!=='') b.onclick = ()=> handlePinKey(k);
+    grid.appendChild(b);
+  });
+  updatePinDots();
+}
+function updatePinDots(){
+  const dots = document.getElementById('pinDots'); dots.innerHTML='';
+  for(let i=0;i<4;i++){ const d=document.createElement('div'); d.className='pinDot'+(i<pinBuffer.length?' filled':''); dots.appendChild(d); }
+}
+function handlePinKey(k){
+  document.getElementById('lockError').textContent='';
+  if(k==='⌫'){ pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); return; }
+  if(pinBuffer.length>=6) return;
+  pinBuffer += k; updatePinDots();
+  if(pinBuffer.length===DB.meta.pin.length){
+    if(pinBuffer===DB.meta.pin){ unlockApp(); }
+    else{ document.getElementById('lockError').textContent='Incorrect PIN, try again.'; setTimeout(()=>{pinBuffer='';updatePinDots();},450); }
+  }
+}
+function unlockApp(){
+  document.getElementById('lockScreen').style.display='none';
+  document.getElementById('shell').classList.add('active');
+  pinBuffer='';
+  init();
+}
+function lockNow(){
+  document.getElementById('lockScreen').style.display='flex';
+  document.getElementById('shell').classList.remove('active');
+  pinBuffer=''; updatePinDots();
+}
+document.getElementById('lockNowBtn').addEventListener('click', lockNow);
+document.getElementById('quickBackupBtn').addEventListener('click', doBackup);
+document.getElementById('langEnBtn').addEventListener('click', ()=>{ setLanguage('en'); syncLangToggle(); });
+document.getElementById('langHiBtn').addEventListener('click', ()=>{ setLanguage('hi'); syncLangToggle(); });
+function syncLangToggle(){
+  document.getElementById('langEnBtn').className = DB.meta.language==='en'?'active':'';
+  document.getElementById('langHiBtn').className = DB.meta.language==='hi'?'active':'';
+}
+
+/* =====================================================================
+   INIT
+===================================================================== */
+const PAGES = {
+  dashboard: renderDashboard, sales: renderSales, buying: renderBuying, girvi: renderGirvi,
+  credit: renderCredit, inventory: renderInventory, jobs: renderJobs, exchange: renderExchange,
+  ledger: renderLedger, history: renderHistory, reports: renderReports, settings: renderSettings,
+  cashday: renderCashday, expenses: renderExpenses, wholesaler: renderWholesaler, calculator: renderCalculator
+};
+function updateClock(){
+  const el = document.getElementById('topDateTime'); if(!el) return;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(DB.meta.language==='hi'?'hi-IN':'en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  const timeStr = now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  el.textContent = dateStr + '  •  ' + timeStr;
+}
+function init(){
+  document.getElementById('brandName').textContent = DB.meta.shopName;
+  document.getElementById('brandLoc').textContent = DB.meta.location.split(',')[0].toUpperCase()+', '+ (DB.meta.location.split(',')[1]||'').toUpperCase();
+  renderNav(); renderRateStrip(); syncLangToggle();
+  goTo('dashboard');
+  updateClock();
+  if(!window._clockInterval) window._clockInterval = setInterval(updateClock, 30000);
+}
+document.getElementById('lockTitle').textContent = DB.meta.shopName;
+renderPinPad();
+</script>
+</body>
+</html>
