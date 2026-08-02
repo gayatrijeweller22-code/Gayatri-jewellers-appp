@@ -146,7 +146,7 @@ nav.navlist{flex:1;padding:6px 10px;}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--gold);}
 .field{margin-bottom:0;}
 
-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+table{width:100%;border-collapse:collapse;font-size:13.5px;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 th{text-align:left;padding:10px 10px;background:var(--gold-pale);color:var(--maroon-dark);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gold-light);}
 td{padding:10px 10px;border-bottom:1px solid var(--line);}
 tr:hover td{background:#FBF8F1;}
@@ -168,12 +168,12 @@ tr:hover td{background:#FBF8F1;}
 
 .modalWrap{position:fixed;inset:0;background:rgba(43,35,32,0.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;}
 .modalWrap.active{display:flex;}
-.modal{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
-.modalHead{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--gold-pale);border-radius:14px 14px 0 0;}
+.modal{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;box-shadow:0 20px 60px rgba(0,0,0,0.3);display:flex;flex-direction:column;overflow:hidden;}
+.modalHead{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--gold-pale);border-radius:14px 14px 0 0;flex-shrink:0;}
 .modalHead h3{margin:0;font-family:var(--font-display);color:var(--maroon-dark);}
 .modalClose{background:transparent;border:none;font-size:22px;color:var(--maroon-dark);}
-.modalBody{padding:20px 22px;}
-.modalFoot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+.modalBody{padding:20px 22px;flex:1;overflow-y:auto;min-height:0;}
+.modalFoot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;flex-shrink:0;background:#fff;}
 
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--maroon-dark);color:#fff;padding:13px 22px;border-radius:10px;font-size:14px;z-index:400;box-shadow:0 8px 24px rgba(0,0,0,0.3);display:none;}
 .toast.show{display:block;}
@@ -221,6 +221,24 @@ tr:hover td{background:#FBF8F1;}
 .wsCard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff;}
 .wsCard .wsName{font-family:var(--font-display);color:var(--maroon-dark);font-size:16px;}
 .wsBalRow{display:flex;gap:18px;margin-top:6px;font-size:13px;color:var(--ink-soft);}
+
+/* ---- Bill printing: hidden on screen, shown only in the print dialog ---- */
+#printArea{display:none;}
+@media print{
+  body *{ visibility:hidden; }
+  #printArea, #printArea *{ visibility:visible; }
+  #printArea{ display:block; position:absolute; top:0; left:0; width:100%; }
+  #lockScreen, #shell, .modalWrap, .toast{ display:none !important; }
+}
+
+/* ---- Global search modal ---- */
+.searchResultGroup{margin-bottom:14px;}
+.searchResultGroup h5{font-family:var(--font-display);color:var(--maroon-dark);margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;}
+.searchResultRow{display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;}
+.searchResultRow:hover{background:var(--bg);}
+
+/* ---- Backup reminder banner ---- */
+.backupWarnBanner{background:var(--warn-bg);border:1px solid var(--gold);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
 </style>
 </head>
 <body>
@@ -266,6 +284,7 @@ tr:hover td{background:#FBF8F1;}
         <div id="topDateTime" class="topClockSub"></div>
       </div>
       <div class="rateStrip">
+        <button class="btn btn-outline btn-sm" onclick="openGlobalSearch()">🔍 Search</button>
         <div class="ratePill">🥇 <span id="topGoldRate">-</span></div>
         <div class="ratePill">🥈 <span id="topSilverRate">-</span></div>
       </div>
@@ -301,9 +320,12 @@ const todayStr = () => new Date().toISOString().slice(0,10);
 const fmtDate = (iso) => { if(!iso) return '-'; const d=new Date(iso); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
 const fmtMoney = (n) => '₹' + (Number(n)||0).toLocaleString('en-IN',{maximumFractionDigits:2});
 const fmtWt = (n) => (Number(n)||0).toLocaleString('en-IN',{maximumFractionDigits:3}) + ' g';
+/* Days between a given date (YYYY-MM-DD) and today (or a second date if given).
+   Used across Girvi ageing, interest calculation, and the backup-reminder banner. */
 const daysBetween = (fromISODate, toISODate) => {
   if(!fromISODate) return 0;
-  const a = new Date(fromISODate+'T00:00:00'), b = new Date((toISODate||todayStr())+'T00:00:00');
+  const a = new Date(String(fromISODate).slice(0,10)+'T00:00:00'), b = new Date((toISODate||todayStr())+'T00:00:00');
+  if(isNaN(a.getTime())) return 0;
   return Math.max(Math.round((b-a)/86400000), 0);
 };
 
@@ -312,10 +334,14 @@ function defaultDB(){
     meta:{
       shopName:'Gayatri Jewellers', location:'Soni Gali, Sarwan, Madhya Pradesh, India',
       startDate:'2024-01-22', pin:'1234', ownerPin:'9999', language:'en',
-      discountApprovalThresholdPct: 3, lastBackupAt:null
+      discountApprovalThresholdPct: 3, lastBackupAt:null,
+      gstin:'', bisLicenceNo:'', signatureLine:'For Gayatri Jewellers',
+      billTermsNote:'Goods once sold will not be taken back or exchanged except as per shop policy. All disputes subject to local jurisdiction.',
+      autoLockMinutes: 0, backupReminderDays: 3
     },
     rateHistory:[],
     currentRates:{ gold24:9800, gold22:8990, silverKg:88000, updatedAt: nowISO() },
+    marketRates:{ goldUsdOz:null, silverUsdOz:null, usdInr:88, fetchedAt:null, source:null, lastError:null, mcxPremiumPct:12 },
     customers:[],
     sales:[], buying:[], girvi:[], creditEntries:[], inventory:[], jobs:[], exchange:[],
     expenses:[], cashDays:[], staff:[{id:uid('STF'),name:'Owner',role:'owner',pin:'1234'}],
@@ -328,7 +354,19 @@ function defaultDB(){
 function migrateDB(d){
   if(!d.wholesalers) d.wholesalers=[];
   if(!d.wholesalerEntries) d.wholesalerEntries=[];
+  if(!d.marketRates) d.marketRates={ goldUsdOz:null, silverUsdOz:null, usdInr:88, fetchedAt:null, source:null, lastError:null, mcxPremiumPct:12 };
+  else if(d.marketRates.mcxPremiumPct===undefined) d.marketRates.mcxPremiumPct=12;
+  else if(d.marketRates.usdInr===null || d.marketRates.usdInr===undefined) d.marketRates.usdInr=88;
+  else if(d.marketRates.lastError===undefined) d.marketRates.lastError=null;
   if(d.meta && d.meta.discountApprovalThresholdPct===undefined) d.meta.discountApprovalThresholdPct=3;
+  if(d.meta){
+    if(d.meta.gstin===undefined) d.meta.gstin='';
+    if(d.meta.bisLicenceNo===undefined) d.meta.bisLicenceNo='';
+    if(d.meta.signatureLine===undefined) d.meta.signatureLine='For '+(d.meta.shopName||'the shop');
+    if(d.meta.billTermsNote===undefined) d.meta.billTermsNote='Goods once sold will not be taken back or exchanged except as per shop policy. All disputes subject to local jurisdiction.';
+    if(d.meta.autoLockMinutes===undefined) d.meta.autoLockMinutes=0;
+    if(d.meta.backupReminderDays===undefined) d.meta.backupReminderDays=3;
+  }
   (d.girvi||[]).forEach(g=>{
     if(!g.transactions){
       g.transactions=[{id:uid('GTX'), date:g.date, type:'Loan Given', amount:g.loanAmount, note:'Initial girvi loan'}];
@@ -342,9 +380,37 @@ function migrateDB(d){
       });
       g.outstandingPrincipal = Math.max(principal,0);
     }
+    if(g.referenceName===undefined) g.referenceName='';
+    if(g.forwards===undefined) g.forwards=[];
+    if(g.notes===undefined) g.notes='';
   });
-  (d.sales||[]).forEach(s=>{ (s.items||[]).forEach(i=>{ if(i.purity===undefined || i.purity==='') i.purity=100; }); });
+  (d.sales||[]).forEach(s=>{ (s.items||[]).forEach(i=>{ if(i.purity===undefined || i.purity==='') i.purity=100; if(i.stoneWeight===undefined) i.stoneWeight=0; }); });
   (d.buying||[]).forEach(b=>{ if(b.purity===undefined || b.purity==='') b.purity=100; });
+  (d.customers||[]).forEach(c=>{
+    if(c.photo===undefined) c.photo=null;
+    if(c.village===undefined) c.village='';
+    if(c.referredBy===undefined) c.referredBy='';
+    if(c.familyLink===undefined) c.familyLink='';
+    if(c.tags===undefined) c.tags='';
+    if(c.notes===undefined) c.notes='';
+    if(c.creditEnabled===undefined){
+      // Backward-compatible: any customer who already has real credit entries
+      // stays visible in Credit — opt-in only applies going forward.
+      c.creditEnabled = (d.creditEntries||[]).some(e=>e.customerId===c.id && !e.deleted);
+    }
+  });
+  (d.inventory||[]).forEach(i=>{
+    ['subcategory','designGroup','size','pairSingle','style','stoneOrNot','customAttr','batchNo','karigarSource','remarks','weightType','sourceType','wholesalerId'].forEach(f=>{
+      if(i[f]===undefined) i[f]='';
+    });
+    if(i.pieceCount===undefined) i.pieceCount=1;
+    if(i.actualPurity===undefined) i.actualPurity='';
+    if(i.billingPurity===undefined) i.billingPurity='';
+    if(i.wholesalerMakingPerGram===undefined) i.wholesalerMakingPerGram='';
+    if(i.wholesalerRateUsed===undefined) i.wholesalerRateUsed='';
+    if(i.linkedSaleId===undefined) i.linkedSaleId=null;
+  });
+  (d.jobs||[]).forEach(j=>{ if(j.karigarName===undefined) j.karigarName=''; });
   return d;
 }
 let DB = loadDB();
@@ -498,12 +564,54 @@ function guardDelete(entityLabel, cb){
   });
 }
 
+/* ---------------------- GLOBAL SEARCH ---------------------- */
+function openGlobalSearch(){
+  const body = `
+    <input id="globalSearchInput" placeholder="Search name, phone, bill no, item, amount, date..." style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;" oninput="runGlobalSearch(this.value)">
+    <div id="globalSearchResults" style="margin-top:14px;max-height:55vh;overflow-y:auto;"></div>
+  `;
+  openModal('Search Everything', body, [{label:'Close', cls:'btn-ghost', onClick:closeModal}]);
+  setTimeout(()=>document.getElementById('globalSearchInput')?.focus(), 50);
+}
+function runGlobalSearch(qRaw){
+  const box = document.getElementById('globalSearchResults'); if(!box) return;
+  const q = (qRaw||'').trim().toLowerCase();
+  if(q.length<2){ box.innerHTML = `<p class="helpText">Type at least 2 characters to search.</p>`; return; }
+  const groups = [];
+
+  const custMatches = DB.customers.filter(c=>c.name.toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.village||'').toLowerCase().includes(q));
+  if(custMatches.length) groups.push({label:'Customers', items: custMatches.map(c=>({text:`${c.name}${c.phone?' — '+c.phone:''}${c.village?' — '+c.village:''}`, action:()=>{ closeModal(); viewCustomerLedger(c.id); }}))});
+
+  const saleMatches = DB.sales.filter(s=>!s.deleted && (s.billNo.toLowerCase().includes(q) || s.customerName.toLowerCase().includes(q) || s.date.includes(q) || String(s.grandTotal).includes(q) || s.items.some(i=>i.itemName.toLowerCase().includes(q))));
+  if(saleMatches.length) groups.push({label:'Sales', items: saleMatches.slice(0,20).map(s=>({text:`${s.billNo} — ${s.customerName} — ${fmtMoney(s.grandTotal)} — ${fmtDate(s.date)}`, action:()=>{ closeModal(); viewSale(s.id); }}))});
+
+  const girviMatches = DB.girvi.filter(g=>!g.deleted && (g.customerName.toLowerCase().includes(q) || (g.itemDesc||'').toLowerCase().includes(q) || (g.referenceName||'').toLowerCase().includes(q) || g.date.includes(q)));
+  if(girviMatches.length) groups.push({label:'Girvi', items: girviMatches.slice(0,20).map(g=>({text:`${g.customerName} — ${g.itemDesc} — ${fmtMoney(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount)} — ${g.status}`, action:()=>{ closeModal(); viewGirvi(g.id); }}))});
+
+  const invMatches = DB.inventory.filter(i=>!i.deleted && (i.itemName.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)));
+  if(invMatches.length) groups.push({label:'Inventory', items: invMatches.slice(0,20).map(i=>({text:`${i.code} — ${i.itemName} — ${fmtWt(i.weight)} — ${i.status}`, action:()=>{ closeModal(); goTo('inventory'); }}))});
+
+  const creditMatches = DB.creditEntries.filter(e=>!e.deleted && ((e.description||'').toLowerCase().includes(q) || String(e.amount).includes(q)));
+  if(creditMatches.length) groups.push({label:'Credit Entries', items: creditMatches.slice(0,20).map(e=>{ const cust=DB.customers.find(c=>c.id===e.customerId); return {text:`${cust?cust.name:'?'} — ${e.type} — ${fmtMoney(e.amount)} — ${fmtDate(e.date)}`, action:()=>{ closeModal(); if(cust) viewCustomerLedger(cust.id); }}; })});
+
+
+  if(groups.length===0){ box.innerHTML = `<div class="empty"><div class="big">🔍</div>No matches for "${qRaw}".</div>`; return; }
+  box.innerHTML = groups.map(g=>`<div class="searchResultGroup"><h5>${g.label} (${g.items.length})</h5>${g.items.map((it,idx)=>`<div class="searchResultRow" data-g="${g.label}" data-i="${idx}">${it.text}</div>`).join('')}</div>`).join('');
+  window._globalSearchGroups = groups;
+  box.querySelectorAll('.searchResultRow').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const g = window._globalSearchGroups.find(x=>x.label===row.dataset.g);
+      if(g) g.items[Number(row.dataset.i)].action();
+    });
+  });
+}
+
 /* ---------------------- CUSTOMER HELPERS ---------------------- */
 function findOrCreateCustomer(name, phone){
   name=(name||'').trim(); if(!name) return null;
   let c = DB.customers.find(x=>x.name.toLowerCase()===name.toLowerCase() && (!phone || x.phone===phone));
   if(!c){
-    c = {id:uid('CUS'), name, phone:phone||'', address:'', notes:'', createdAt:nowISO()};
+    c = {id:uid('CUS'), name, phone:phone||'', address:'', notes:'', createdAt:nowISO(), creditEnabled:false, village:'', referredBy:'', familyLink:'', tags:'', photo:null};
     DB.customers.push(c);
     logHistory('Customer','Created','New customer added: '+name);
   }
@@ -533,7 +641,17 @@ function renderDashboard(){
   const overdueGirvi = activeGirvi.filter(g=>g.dueDate && g.dueDate < today);
   const wholesalerTotals = DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,cash:0});
 
-  let html = `<div class="statGrid">
+  let html = '';
+  const backupDays = DB.meta.backupReminderDays||3;
+  const daysSinceBackup = DB.meta.lastBackupAt ? daysBetween(DB.meta.lastBackupAt.slice(0,10)) : null;
+  if(daysSinceBackup===null || daysSinceBackup>=backupDays){
+    html += `<div class="backupWarnBanner">
+      <div>⚠️ ${daysSinceBackup===null?"You haven't backed up yet.":`It's been ${daysSinceBackup} day(s) since your last backup.`} Keep your shop data safe.</div>
+      <button class="btn btn-gold btn-sm" onclick="doBackup()">⬇ Backup Now</button>
+    </div>`;
+  }
+
+  html += `<div class="statGrid">
     <div class="statCard"><div class="lbl">Today's Sales</div><div class="val">${fmtMoney(todaySalesTotal)}</div><div class="sub">${todaySales.length} bill(s)</div></div>
     <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Active Girvi Loans</div><div class="val">${fmtMoney(totalGirviOut)}</div><div class="sub">${activeGirvi.length} item(s) held</div></div>
     <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Total Credit Due</div><div class="val">${fmtMoney(creditDue)}</div><div class="sub">across ${DB.customers.length} customers</div></div>
@@ -556,7 +674,15 @@ function renderDashboard(){
     <tr><td>Gold 24K</td><td>${fmtMoney(DB.currentRates.gold24)} / 10g</td></tr>
     <tr><td>Gold 22K</td><td>${fmtMoney(DB.currentRates.gold22)} / 10g</td></tr>
     <tr><td>Silver</td><td>${fmtMoney(DB.currentRates.silverKg)} / kg</td></tr>
-    </table><div class="helpText">Last updated: ${fmtDate(DB.currentRates.updatedAt)}</div></div>`;
+    </table><div class="helpText">Last updated: ${fmtDate(DB.currentRates.updatedAt)}. These are the rates used in your bills.</div>
+    <div style="border-top:1px dashed var(--gold-light);margin-top:14px;padding-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11.5px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);">📈 Live MCX &amp; Spot Rates (reference only — never used in billing)</span>
+        <button class="btn btn-sm btn-ghost" onclick="fetchMarketRates()">↻</button>
+      </div>
+      <div id="dashMarketMini" style="margin-top:6px;font-size:13px;"></div>
+    </div>
+    </div>`;
   html += `</div>`;
 
   html += `<div class="card"><div class="cardHead"><h3>Quick Actions</h3></div>
@@ -570,6 +696,12 @@ function renderDashboard(){
     </div></div>`;
 
   document.getElementById('content').innerHTML = html;
+  renderDashboardMarketMini();
+  const isStale = !DB.marketRates.fetchedAt || daysBetween(DB.marketRates.fetchedAt.slice(0,10)) >= 1;
+  if(isStale && !window._marketRatesTriedThisSession){
+    window._marketRatesTriedThisSession = true;
+    fetchMarketRates(true);
+  }
 }
 
 /* =====================================================================
@@ -608,6 +740,7 @@ function deleteSale(id){
   const s = DB.sales.find(x=>x.id===id); if(!s) return;
   guardDelete('sale bill ('+s.billNo+')', ()=>{
     s.deleted = true;
+    releaseInventoryForSale(s);
     logHistory('Sales','Deleted', `Bill ${s.billNo} for ${s.customerName} deleted`);
     saveDB(); closeModal(); renderSales(); toast('Bill deleted');
   });
@@ -660,9 +793,11 @@ function renderSaleItemRows(){
   wrap.innerHTML = saleDraftItems.map((it,i)=>{
     const purity = (it.purity===undefined||it.purity==='')?100:it.purity;
     const pureWt = (Number(it.weight)||0) * (Number(purity)||0)/100;
+    const linkedItem = it.linkedInventoryId ? DB.inventory.find(x=>x.id===it.linkedInventoryId) : null;
     return `
     <div class="itemRow" style="grid-template-columns:1.2fr 0.85fr 0.7fr 0.75fr 0.8fr 0.75fr 0.8fr 0.85fr auto;">
-      <div class="field"><label>Item</label><input value="${it.itemName}" placeholder="e.g. Silver Payal" oninput="saleDraftItems[${i}].itemName=this.value"></div>
+      <div class="field"><label>Item</label><input value="${it.itemName}" placeholder="e.g. Silver Payal" oninput="saleDraftItems[${i}].itemName=this.value">
+        <button class="btn btn-sm btn-ghost" style="margin-top:3px;padding:2px 6px;font-size:10px;" onclick="pickInventoryForSaleItem(${i})">🔗 ${linkedItem?'Linked: '+linkedItem.code:'Link Stock'}</button></div>
       <div class="field"><label>${T('category')}</label>
         <select onchange="saleDraftItems[${i}].category=this.value; autoFillRate(${i}); recalcSaleTotals();">
           <option ${it.category==='Silver'?'selected':''}>Silver</option>
@@ -681,6 +816,32 @@ function renderSaleItemRows(){
     </div>
   `;}).join('');
   saleDraftItems.forEach((it,i)=> autoFillRate(i));
+}
+function pickInventoryForSaleItem(rowIndex){
+  const stock = DB.inventory.filter(x=>!x.deleted && x.status==='in-stock');
+  const body = `
+    <input id="invPickerSearch" placeholder="Search item / code..." style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:8px;margin-bottom:10px;" oninput="renderInvPickerList(${rowIndex}, this.value)">
+    <div id="invPickerList" style="max-height:45vh;overflow-y:auto;"></div>
+  `;
+  openModal('Link an Inventory Item', body, [{label:'Cancel', cls:'btn-ghost', onClick:closeModal}]);
+  renderInvPickerList(rowIndex, '');
+}
+function renderInvPickerList(rowIndex, q){
+  q=(q||'').toLowerCase();
+  const stock = DB.inventory.filter(x=>!x.deleted && x.status==='in-stock' && (!q || x.itemName.toLowerCase().includes(q) || x.code.toLowerCase().includes(q)));
+  const box = document.getElementById('invPickerList'); if(!box) return;
+  if(stock.length===0){ box.innerHTML = `<div class="empty"><div class="big">💍</div>No matching in-stock items.</div>`; return; }
+  box.innerHTML = stock.map(x=>`<div class="searchResultRow" onclick="linkInventoryToSaleItem(${rowIndex}, '${x.id}')"><span>${x.code} — ${x.itemName} (${fmtWt(x.weight)}, ${x.purity}${typeof x.purity==='number'?'%':''}, qty ${x.qty})</span><span>Select</span></div>`).join('');
+}
+function linkInventoryToSaleItem(rowIndex, invId){
+  const item = DB.inventory.find(x=>x.id===invId); if(!item) return;
+  const purity = parseFloat(item.purity);
+  saleDraftItems[rowIndex] = {
+    ...saleDraftItems[rowIndex],
+    itemName: item.itemName, category: item.category==='Other'?'Custom':item.category,
+    weight: item.weight, purity: isNaN(purity)?100:purity, linkedInventoryId: item.id
+  };
+  closeModal(); renderSaleItemRows(); recalcSaleTotals(); toast('Linked to '+item.code);
 }
 function autoFillRate(i){
   const it = saleDraftItems[i]; if(!it) return;
@@ -731,8 +892,11 @@ function saveSale(){
     const cleanItems = saleDraftItems.filter(i=>i.itemName).map(i=>({...i, purity:(i.purity===undefined||i.purity==='')?100:Number(i.purity)}));
     if(editingSaleId){
       const s = DB.sales.find(x=>x.id===editingSaleId);
+      // Release any inventory items that were linked to this sale before, so relinking is clean
+      DB.inventory.filter(inv=>inv.linkedSaleId===s.id).forEach(inv=>{ inv.status='in-stock'; inv.linkedSaleId=null; inv.soldDate=null; });
       s.customerId=cust.id; s.customerName=cust.name; s.date=saleDate; s.items=cleanItems;
       s.subTotal=sub; s.discount=discount; s.discountPct=pct; s.grandTotal=grand; s.paymentMode=payMode; s.amountPaid=amountPaid;
+      applyInventoryDeduction(s);
       logHistory('Sales','Edited', `Bill ${s.billNo} edited for ${cust.name} — new total ${fmtMoney(grand)}`);
       saveDB(); closeModal(); toast('Sale updated: '+s.billNo); renderSales();
     } else {
@@ -742,6 +906,7 @@ function saveSale(){
         subTotal: sub, discount, discountPct: pct, grandTotal: grand, paymentMode: payMode, amountPaid, void:false
       };
       DB.sales.push(sale);
+      applyInventoryDeduction(sale);
       if(amountPaid < grand){
         DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:saleDate, type:'debit', amount: grand-amountPaid, description:'Sale '+sale.billNo, createdAt: nowISO()});
       }
@@ -753,6 +918,25 @@ function saveSale(){
   if(pct > DB.meta.discountApprovalThresholdPct){
     askOwnerApproval(`This bill has a discount of ${pct.toFixed(1)}%, above the allowed ${DB.meta.discountApprovalThresholdPct}%. Owner PIN is required to proceed.`, ()=>finalize());
   } else finalize();
+}
+/* Marks every inventory item linked to this sale's items as sold, and logs it.
+   Called on both new sales and edits (edits release old links first). */
+function applyInventoryDeduction(sale){
+  sale.items.forEach(it=>{
+    if(!it.linkedInventoryId) return;
+    const inv = DB.inventory.find(x=>x.id===it.linkedInventoryId && !x.deleted);
+    if(!inv) return;
+    inv.status = 'sold'; inv.soldDate = sale.date; inv.linkedSaleId = sale.id;
+    logHistory('Inventory','Sold', `${inv.itemName} (${inv.code}) sold via bill ${sale.billNo}`);
+  });
+}
+/* Reverses the sold status on any inventory linked to this sale — used when
+   a bill is voided or deleted, so stock stays accurate. */
+function releaseInventoryForSale(sale){
+  DB.inventory.filter(inv=>inv.linkedSaleId===sale.id).forEach(inv=>{
+    inv.status='in-stock'; inv.linkedSaleId=null; inv.soldDate=null;
+    logHistory('Inventory','Returned to Stock', `${inv.itemName} (${inv.code}) returned to stock — bill ${sale.billNo} was voided/deleted`);
+  });
 }
 function viewSale(id){
   const s = DB.sales.find(x=>x.id===id); if(!s) return;
@@ -771,16 +955,470 @@ function viewSale(id){
     <div class="totalsRow"><span>Balance</span><span>${fmtMoney(s.grandTotal-s.amountPaid)}</span></div>
   </div>`;
   const foot = [{label:'Close', cls:'btn-ghost', onClick:closeModal}];
+  foot.push({label:'🖨 Print Bill', cls:'btn-gold', onClick:()=>openPrintPreview(s.id)});
   if(!s.void){
     foot.push({label:'✎ Edit', cls:'btn-outline', onClick:()=>{ guardEdit('sale bill ('+s.billNo+')', ()=>openSaleForm(s.id)); }});
     foot.push({label:'Void Bill', cls:'btn-danger', onClick:()=>{
       askOwnerApproval('Voiding a bill requires owner approval. This will not delete the record — it stays in History.', ()=>{
-        s.void=true; logHistory('Sales','Voided','Bill '+s.billNo+' voided'); saveDB(); closeModal(); renderSales(); toast('Bill voided');
+        s.void=true; releaseInventoryForSale(s); logHistory('Sales','Voided','Bill '+s.billNo+' voided'); saveDB(); closeModal(); renderSales(); toast('Bill voided');
       });
     }});
   }
   foot.push({label:'🗑 Delete', cls:'btn-danger', onClick:()=>deleteSale(s.id)});
   openModal('Sale — '+s.billNo, body, foot);
+}
+function openPrintPreview(saleId){
+  const body = `
+    <p class="helpText" style="margin-top:0;">Choose a layout, then print to a thermal printer, AirPrint, or "Save as PDF" — or share directly as text or a PDF file.</p>
+    <div class="pillTabs">
+      <div class="pillTab active" onclick="setPrintLayout(this,'a4')">A4 / Full Page</div>
+      <div class="pillTab" onclick="setPrintLayout(this,'thermal')">Thermal Receipt</div>
+    </div>
+    <div id="printPreviewBox" style="border:1px solid var(--line);border-radius:8px;padding:16px;background:#fff;max-height:50vh;overflow-y:auto;"></div>
+  `;
+  window._printLayout = 'a4';
+  openModal('Print Preview', body, [
+    {label:'Close', cls:'btn-ghost', onClick:closeModal},
+    {label:'📤 Share Text', cls:'btn-outline', onClick:()=>shareBill(saleId)},
+    {label:'📄 Share PDF', cls:'btn-outline', onClick:()=>shareBillPdf(saleId)},
+    {label:'🖨 Print Now', cls:'btn-primary', onClick:()=>doPrint(saleId)}
+  ]);
+  renderPrintPreview(saleId);
+}
+function setPrintLayout(el, layout){
+  document.querySelectorAll('.modalBody .pillTab').forEach(p=>p.classList.remove('active')); el.classList.add('active');
+  window._printLayout = layout;
+  renderPrintPreview(window._printSaleId);
+}
+function numberToWordsIndian(num){
+  num = Math.round(Number(num)||0);
+  if(num===0) return 'Zero Rupees Only';
+  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function twoDigit(n){ if(n<20) return ones[n]; return tens[Math.floor(n/10)]+(n%10?' '+ones[n%10]:''); }
+  function threeDigit(n){ if(n<100) return twoDigit(n); return ones[Math.floor(n/100)]+' Hundred'+(n%100?' '+twoDigit(n%100):''); }
+  let n = num, parts=[];
+  const crore=Math.floor(n/10000000); n%=10000000;
+  const lakh=Math.floor(n/100000); n%=100000;
+  const thousand=Math.floor(n/1000); n%=1000;
+  const rest=n;
+  if(crore) parts.push(threeDigit(crore)+' Crore');
+  if(lakh) parts.push(threeDigit(lakh)+' Lakh');
+  if(thousand) parts.push(threeDigit(thousand)+' Thousand');
+  if(rest) parts.push(threeDigit(rest));
+  return (parts.join(' ')||'Zero')+' Rupees Only';
+}
+function buildBillHTML(s, layout){
+  const m = DB.meta;
+  const cust = DB.customers.find(c=>c.id===s.customerId) || {};
+  const rows = s.items.map(i=>{
+    const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
+    const pw=(i.weight||0)*(purity/100);
+    const stoneWt = Number(i.stoneWeight||0);
+    const amt=pw*(i.rate||0)+Number(i.making||0);
+    return {name:i.itemName, category:i.category, weight:i.weight, purity, pureWt:pw, stoneWt, rate:i.rate, making:i.making, amt};
+  });
+  const narrow = layout==='thermal';
+  const balance = s.grandTotal-s.amountPaid;
+
+  if(narrow){
+    return `
+    <div style="font-family:'Courier New',monospace;color:#000;width:280px;margin:0 auto;font-size:12px;line-height:1.4;">
+      <div style="text-align:center;margin-bottom:6px;">
+        <div style="font-family:var(--font-display);font-size:17px;font-weight:bold;">${m.shopName}</div>
+        <div style="font-size:10px;">${m.location}</div>
+        ${m.gstin?`<div style="font-size:10px;">GSTIN: ${m.gstin}</div>`:''}
+        ${m.bisLicenceNo?`<div style="font-size:10px;">BIS: ${m.bisLicenceNo}</div>`:''}
+      </div>
+      <div style="border-top:1px dashed #000;border-bottom:1px dashed #000;padding:5px 0;margin-bottom:6px;">
+        <div>Bill: <b>${s.billNo}</b></div><div>${new Date(s.createdAt||s.date).toLocaleString('en-IN')}</div>
+        <div>${s.customerName}${cust.phone?' — '+cust.phone:''}</div>
+      </div>
+      ${rows.map(r=>`<div style="margin-bottom:4px;">
+        <div><b>${r.name}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;"><span>${r.weight}g @ ${r.purity}% × ${r.rate}${r.making?' +'+r.making+' mkg':''}</span><span>${fmtMoney(r.amt)}</span></div>
+      </div>`).join('')}
+      <div style="border-top:1px dashed #000;margin-top:6px;padding-top:5px;">
+        <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>${fmtMoney(s.subTotal)}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Discount</span><span>- ${fmtMoney(s.discount)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;border-top:1px solid #000;margin-top:4px;padding-top:4px;"><span>TOTAL</span><span>${fmtMoney(s.grandTotal)}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Paid (${s.paymentMode})</span><span>${fmtMoney(s.amountPaid)}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Balance</span><span>${fmtMoney(balance)}</span></div>
+      </div>
+      <div style="margin-top:14px;text-align:center;font-size:10px;">${m.signatureLine||'Signature'}</div>
+      <div style="margin-top:10px;text-align:center;font-size:9.5px;">Thank you for your business.</div>
+      ${m.billTermsNote?`<div style="margin-top:8px;font-size:8px;border-top:1px dashed #000;padding-top:5px;">${m.billTermsNote}</div>`:''}
+    </div>`;
+  }
+
+  return `
+    <div style="font-family:var(--font-body);color:#2B2320;width:100%;max-width:680px;margin:0 auto;font-size:13px;border:1.5px solid #AD8A3B;border-radius:4px;overflow:hidden;">
+      <div style="background:linear-gradient(135deg,#6E1423,#450D17);color:#fff;padding:20px 26px;text-align:center;">
+        <div style="font-family:var(--font-display);font-size:26px;letter-spacing:1px;">${m.shopName}</div>
+        <div style="font-size:12px;color:#E4D4A7;margin-top:3px;">${m.location}</div>
+        <div style="font-size:11px;color:#E4D4A7;margin-top:2px;">${[m.gstin?'GSTIN: '+m.gstin:'', m.bisLicenceNo?'BIS Licence: '+m.bisLicenceNo:''].filter(Boolean).join('   •   ')}</div>
+      </div>
+      <div style="text-align:center;padding:8px;background:#F3EAD1;font-family:var(--font-display);font-size:15px;letter-spacing:2px;color:#450D17;border-bottom:1px solid #E4D4A7;">TAX INVOICE</div>
+      <div style="padding:18px 26px 4px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12.5px;">
+        <div><div style="color:#6B5F55;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;">Bill No</div><div style="font-weight:600;font-size:15px;">${s.billNo}</div></div>
+        <div><div style="color:#6B5F55;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;">Date &amp; Time</div><div style="font-weight:600;">${new Date(s.createdAt||s.date).toLocaleString('en-IN')}</div></div>
+        <div style="text-align:right;"><div style="color:#6B5F55;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;">Customer</div><div style="font-weight:600;">${s.customerName}</div><div style="font-size:11.5px;color:#6B5F55;">${cust.phone||''}</div></div>
+      </div>
+      <div style="padding:14px 26px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <tr style="background:#F3EAD1;">
+            <th style="text-align:left;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Item</th>
+            <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Wt</th>
+            <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Purity</th>
+            <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Rate</th>
+            <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Making</th>
+            <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Amount</th>
+          </tr>
+          ${rows.map((r,idx)=>`<tr style="background:${idx%2?'#FBF8F1':'#fff'};">
+            <td style="padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.name}${r.stoneWt?`<div style="font-size:10px;color:#6B5F55;">(stone deduction: ${r.stoneWt}g)</div>`:''}</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.weight}g</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.purity}%</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">${fmtMoney(r.rate)}</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">${fmtMoney(r.making)}</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;font-weight:600;">${fmtMoney(r.amt)}</td>
+          </tr>`).join('')}
+        </table>
+      </div>
+      <div style="padding:0 26px 6px;display:flex;justify-content:flex-end;">
+        <div style="width:280px;background:#F3EAD1;border:1px solid #E4D4A7;border-radius:8px;padding:12px 16px;">
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Subtotal</span><span>${fmtMoney(s.subTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Discount</span><span>- ${fmtMoney(s.discount)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;border-top:1px dashed #AD8A3B;font-family:var(--font-display);font-size:19px;color:#450D17;"><span>Total</span><span>${fmtMoney(s.grandTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 0;font-size:12px;"><span>Paid (${s.paymentMode})</span><span>${fmtMoney(s.amountPaid)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:12px;font-weight:${balance>0?'700':'400'};color:${balance>0?'#AD3B32':'#2B2320'};"><span>Balance Due</span><span>${fmtMoney(balance)}</span></div>
+        </div>
+      </div>
+      <div style="padding:4px 26px 14px;font-size:11.5px;font-style:italic;color:#6B5F55;">Amount in words: ${numberToWordsIndian(s.grandTotal)}</div>
+      <div style="padding:20px 26px 8px;display:flex;justify-content:space-between;align-items:flex-end;">
+        <div style="font-size:11px;color:#6B5F55;">Thank you for your business.</div>
+        <div style="text-align:center;font-size:11.5px;"><div style="border-top:1.5px solid #2B2320;padding-top:5px;width:170px;">${m.signatureLine||'Signature'}</div></div>
+      </div>
+      ${m.billTermsNote?`<div style="padding:10px 26px;font-size:9.5px;color:#8A8378;background:#FBF8F1;border-top:1px solid #EEE6D3;">${m.billTermsNote}</div>`:''}
+    </div>
+  `;
+}
+function renderPrintPreview(saleId){
+  window._printSaleId = saleId;
+  const s = DB.sales.find(x=>x.id===saleId); if(!s) return;
+  const box = document.getElementById('printPreviewBox'); if(!box) return;
+  box.innerHTML = buildBillHTML(s, window._printLayout||'a4');
+}
+function doPrint(saleId){
+  const s = DB.sales.find(x=>x.id===saleId); if(!s) return;
+  let area = document.getElementById('printArea');
+  if(!area){ area = document.createElement('div'); area.id='printArea'; document.body.appendChild(area); }
+  area.innerHTML = buildBillHTML(s, window._printLayout||'a4');
+  logHistory('Sales','Printed', `Bill ${s.billNo} sent to print (${window._printLayout||'a4'})`);
+  saveDB();
+  setTimeout(()=>window.print(), 100);
+}
+
+/* ---------------------- Generic receipt printer: Buying / Girvi / Jobs ---------------------- */
+/* =====================================================================
+   MINIMAL PDF GENERATOR — pure vanilla JS, no external library, so it
+   works fully offline. Produces a valid multi-page PDF from plain text
+   lines using the built-in Helvetica base font. Note: PDF base fonts
+   only support Latin-1 text, so ₹ is rendered as "Rs" and any Hindi/
+   non-Latin characters are shown as "?" in the PDF specifically
+   (print and on-screen Rupee/Hindi text elsewhere are unaffected).
+===================================================================== */
+function escapePdfText(s){ return String(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
+function toPdfSafeText(s){ return String(s).replace(/₹/g,'Rs ').replace(/[^\x00-\xFF]/g,'?'); }
+function buildPdfBytes(lineObjs){
+  const pageWidth=595, pageHeight=842, marginX=50, topY=800, bottomY=50, defaultSize=10, defaultLeading=14;
+  const laidOutPages = [];
+  let y = topY, current = [];
+  lineObjs.forEach(lo=>{
+    const size = lo.size || defaultSize;
+    const leading = lo.leading || (lo.big ? size+8 : defaultLeading);
+    if(y - leading < bottomY){ laidOutPages.push(current); current=[]; y=topY; }
+    current.push(Object.assign({}, lo, {y, size}));
+    y -= leading;
+  });
+  laidOutPages.push(current);
+  if(laidOutPages.length===0) laidOutPages.push([]);
+
+  const catalogNum=1, pagesNum=2, fontRegNum=3, fontBoldNum=4;
+  let nextObjNum=5;
+  const pageObjNums=[], contentObjNums=[], contentStrings=[];
+  laidOutPages.forEach(pageLines=>{
+    const contentNum=nextObjNum++; contentObjNums.push(contentNum);
+    const pageNum=nextObjNum++; pageObjNums.push(pageNum);
+    let stream = '';
+    pageLines.forEach(lo=>{
+      if(lo.rule){
+        stream += `${marginX} ${lo.y+4} m ${pageWidth-marginX} ${lo.y+4} l S\n`;
+      } else if(lo.text!==undefined && lo.text!==null){
+        const font = lo.bold ? '/F2' : '/F1';
+        const x = lo.right ? (pageWidth-marginX-(lo.text.length*lo.size*0.52)) : marginX;
+        stream += `BT ${font} ${lo.size} Tf ${x.toFixed(1)} ${lo.y} Td (${escapePdfText(lo.text)}) Tj ET\n`;
+      }
+    });
+    contentStrings.push(stream);
+  });
+  const objMap = {};
+  objMap[catalogNum] = `<< /Type /Catalog /Pages ${pagesNum} 0 R >>`;
+  objMap[pagesNum] = `<< /Type /Pages /Kids [${pageObjNums.map(n=>n+' 0 R').join(' ')}] /Count ${pageObjNums.length} >>`;
+  objMap[fontRegNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`;
+  objMap[fontBoldNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>`;
+  pageObjNums.forEach((pageNum,idx)=>{
+    objMap[pageNum] = `<< /Type /Page /Parent ${pagesNum} 0 R /Resources << /Font << /F1 ${fontRegNum} 0 R /F2 ${fontBoldNum} 0 R >> >> /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${contentObjNums[idx]} 0 R >>`;
+  });
+  contentObjNums.forEach((contentNum,idx)=>{
+    const stream = contentStrings[idx];
+    objMap[contentNum] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+  const maxObjNum = nextObjNum-1;
+  let pdf = '%PDF-1.4\n';
+  const offsets = {};
+  for(let n=1;n<=maxObjNum;n++){ offsets[n]=pdf.length; pdf += `${n} 0 obj\n${objMap[n]}\nendobj\n`; }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${maxObjNum+1}\n0000000000 65535 f \n`;
+  for(let n=1;n<=maxObjNum;n++){ pdf += String(offsets[n]).padStart(10,'0')+' 00000 n \n'; }
+  pdf += `trailer\n<< /Size ${maxObjNum+1} /Root ${catalogNum} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  const bytes = new Uint8Array(pdf.length);
+  for(let i=0;i<pdf.length;i++) bytes[i] = pdf.charCodeAt(i) & 0xFF;
+  return bytes;
+}
+/* Convenience: turn a flat array of plain strings into simple line objects
+   (kept for any caller that still wants plain text-only PDFs). */
+function pdfBlobFromLines(rawLines){
+  const lineObjs = rawLines.map(l=>({text: toPdfSafeText(l)}));
+  const bytes = buildPdfBytes(lineObjs);
+  return new Blob([bytes], {type:'application/pdf'});
+}
+function pdfBlobFromLayout(lineObjs){
+  const safe = lineObjs.map(lo=> lo.rule ? lo : Object.assign({}, lo, {text: lo.text!==undefined ? toPdfSafeText(lo.text) : lo.text}));
+  const bytes = buildPdfBytes(safe);
+  return new Blob([bytes], {type:'application/pdf'});
+}
+async function sharePdfBlob(blob, filename, title){
+  try{
+    const file = new File([blob], filename, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title});
+      toast('PDF shared'); return;
+    }
+  }catch(err){ if(err.name==='AbortError') return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('PDF downloaded — attach it manually in WhatsApp or any app');
+}
+async function shareBillPdf(saleId){
+  const s = DB.sales.find(x=>x.id===saleId); if(!s) return;
+  const m = DB.meta;
+  const cust = DB.customers.find(c=>c.id===s.customerId) || {};
+  let L = [];
+  L.push({text:m.shopName, bold:true, size:18, big:true});
+  L.push({text:m.location, size:10});
+  if(m.gstin) L.push({text:'GSTIN: '+m.gstin, size:9});
+  if(m.bisLicenceNo) L.push({text:'BIS Licence: '+m.bisLicenceNo, size:9});
+  L.push({rule:true, leading:10});
+  L.push({text:'TAX INVOICE', bold:true, size:12});
+  L.push({text:'Bill No: '+s.billNo+'    Date: '+new Date(s.createdAt||s.date).toLocaleString('en-IN'), size:10});
+  L.push({text:'Customer: '+s.customerName+(cust.phone?'  ('+cust.phone+')':''), size:10});
+  L.push({rule:true, leading:12});
+  L.push({text:'Item', bold:true, size:10}); // header row rendered as plain text row for simplicity
+  s.items.forEach(i=>{
+    const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
+    const pw=(i.weight||0)*(purity/100);
+    const amt=pw*(i.rate||0)+Number(i.making||0);
+    L.push({text:i.itemName+'  —  '+i.weight+'g @ '+purity+'%  ×  Rs '+i.rate+(i.making?'  + making Rs '+i.making:''), size:10});
+    L.push({text:'   Amount: Rs '+Math.round(amt).toLocaleString('en-IN'), size:9.5});
+  });
+  L.push({rule:true, leading:12});
+  L.push({text:'Subtotal: Rs '+Math.round(s.subTotal).toLocaleString('en-IN'), size:10});
+  L.push({text:'Discount: - Rs '+Math.round(s.discount).toLocaleString('en-IN'), size:10});
+  L.push({text:'TOTAL: Rs '+Math.round(s.grandTotal).toLocaleString('en-IN'), bold:true, size:14, big:true});
+  L.push({text:'Paid ('+s.paymentMode+'): Rs '+Math.round(s.amountPaid).toLocaleString('en-IN'), size:10});
+  L.push({text:'Balance: Rs '+Math.round(s.grandTotal-s.amountPaid).toLocaleString('en-IN'), size:10});
+  L.push({text:'Amount in words: '+numberToWordsIndian(s.grandTotal), size:9});
+  L.push({rule:true, leading:16});
+  L.push({text:m.signatureLine||'Signature', size:9});
+  if(m.billTermsNote) L.push({text:m.billTermsNote, size:7.5});
+  const blob = pdfBlobFromLayout(L);
+  logHistory('Sales','PDF Shared', `Bill ${s.billNo} shared as PDF`);
+  saveDB();
+  await sharePdfBlob(blob, 'Bill-'+s.billNo+'.pdf', 'Bill '+s.billNo);
+}
+function receiptPdfLayout(docTitle, rows, extraNote){
+  const m = DB.meta;
+  let L = [];
+  L.push({text:m.shopName, bold:true, size:16, big:true});
+  L.push({text:m.location, size:10});
+  if(m.gstin) L.push({text:'GSTIN: '+m.gstin, size:9});
+  if(m.bisLicenceNo) L.push({text:'BIS Licence: '+m.bisLicenceNo, size:9});
+  L.push({rule:true, leading:10});
+  L.push({text:docTitle, bold:true, size:13});
+  L.push({rule:true, leading:10});
+  rows.forEach(r=> L.push({text:r[0]+': '+r[1], size:10}));
+  if(extraNote){ L.push({rule:true, leading:8}); L.push({text:String(extraNote).replace(/<[^>]+>/g,''), size:9}); }
+  L.push({rule:true, leading:14});
+  L.push({text:'Thank you.', size:9});
+  return L;
+}
+async function sharePdfReceipt(docTitle, rows, extraNote, filenamePrefix, historyModule, historyDesc){
+  const blob = pdfBlobFromLayout(receiptPdfLayout(docTitle, rows, extraNote));
+  if(historyModule) logHistory(historyModule, 'PDF Shared', historyDesc||(docTitle+' shared as PDF'));
+  saveDB();
+  await sharePdfBlob(blob, filenamePrefix+'.pdf', docTitle);
+}
+function sharePdfBuying(id){
+  const b = DB.buying.find(x=>x.id===id); if(!b) return;
+  const purity = (b.purity===undefined||b.purity==='')?100:b.purity;
+  const pw = (b.weight||0)*(purity/100);
+  const rows = [
+    ['Date', fmtDate(b.date)], ['Customer', b.customerName], ['Item', b.itemDesc], ['Metal', b.metal],
+    ['Weight', fmtWt(b.weight)], ['Purity', purity+'%'], ['Pure Weight', fmtWt(pw)],
+    ['Rate', fmtMoney(b.rateApplied)+'/g'], ['Amount Paid', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]
+  ];
+  sharePdfReceipt('Purchase Receipt', rows, null, 'Purchase-'+b.id, 'Buying', `Receipt shared as PDF for purchase from ${b.customerName}`);
+}
+function sharePdfGirvi(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+  const rows = [
+    ['Date', fmtDate(g.date)], ['Customer', g.customerName], ['Item', g.itemDesc], ['Metal', g.metal],
+    ['Weight', fmtWt(g.weight)], ['Purity', (g.purity||100)+'%'], ['Loan Amount', fmtMoney(g.loanAmount)],
+    ['Outstanding Principal', fmtMoney(principal)], ['Interest Rate', g.interestRatePct+'% / month'],
+    ['Due Date', g.dueDate?fmtDate(g.dueDate):'-'], ['Reference', g.referenceName||'-']
+  ];
+  sharePdfReceipt('Girvi Receipt', rows, 'This item is held as security against the loan amount above.', 'Girvi-'+g.id, 'Girvi', `Receipt shared as PDF for ${g.customerName}'s girvi`);
+}
+function sharePdfJob(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const rows = [
+    ['Date', fmtDate(j.date)], ['Customer', j.customerName], ['Job Type', j.type], ['Item', j.itemDesc],
+    ['Given to Karigar', j.karigarName||'-'], ['Weight In', fmtWt(j.weightIn)], ['Weight Out (Expected)', fmtWt(j.weightOut)],
+    ['Labour Charge', fmtMoney(j.labourCharge)], ['Expected Delivery', j.expectedDate?fmtDate(j.expectedDate):'-'], ['Status', j.status]
+  ];
+  sharePdfReceipt((j.type||'Job')+' Receipt', rows, null, 'Job-'+j.id, 'Jobs', `Receipt shared as PDF for ${j.customerName}'s ${j.type} job`);
+}
+
+function buildReceiptHTML(docTitle, rows, extraNote){
+  const m = DB.meta;
+  return `
+    <div style="font-family:var(--font-body);color:#000;width:100%;max-width:520px;margin:0 auto;font-size:13px;">
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-family:var(--font-display);font-size:22px;font-weight:bold;">${m.shopName}</div>
+        <div style="font-size:12px;">${m.location}</div>
+        ${m.gstin?`<div style="font-size:11px;">GSTIN: ${m.gstin}</div>`:''}
+        ${m.bisLicenceNo?`<div style="font-size:11px;">BIS Licence: ${m.bisLicenceNo}</div>`:''}
+      </div>
+      <div style="text-align:center;font-family:var(--font-display);font-size:16px;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:6px 0;margin-bottom:10px;">${docTitle}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        ${rows.map(r=>`<tr><td style="padding:5px 4px;font-weight:600;width:42%;vertical-align:top;">${r[0]}</td><td style="padding:5px 4px;">${r[1]}</td></tr>`).join('')}
+      </table>
+      ${extraNote?`<div style="margin-top:10px;font-size:11.5px;">${extraNote}</div>`:''}
+      <div style="margin-top:30px;display:flex;justify-content:space-between;align-items:flex-end;">
+        <div style="font-size:11px;">Thank you.</div>
+        <div style="text-align:center;font-size:11px;"><div style="border-top:1px solid #000;padding-top:3px;width:150px;">${m.signatureLine||'Signature'}</div></div>
+      </div>
+    </div>
+  `;
+}
+function printGenericReceipt(docTitle, rows, extraNote, historyModule, historyDesc){
+  let area = document.getElementById('printArea');
+  if(!area){ area = document.createElement('div'); area.id='printArea'; document.body.appendChild(area); }
+  area.innerHTML = buildReceiptHTML(docTitle, rows, extraNote);
+  if(historyModule) logHistory(historyModule, 'Printed', historyDesc||(docTitle+' printed'));
+  saveDB();
+  setTimeout(()=>window.print(), 100);
+}
+function printBuyingReceipt(id){
+  const b = DB.buying.find(x=>x.id===id); if(!b) return;
+  const purity = (b.purity===undefined||b.purity==='')?100:b.purity;
+  const pw = (b.weight||0)*(purity/100);
+  const rows = [
+    ['Date', fmtDate(b.date)], ['Customer', b.customerName], ['Item', b.itemDesc], ['Metal', b.metal],
+    ['Weight', fmtWt(b.weight)], ['Purity', purity+'%'], ['Pure Weight', fmtWt(pw)],
+    ['Rate', fmtMoney(b.rateApplied)+'/g'], ['Amount Paid', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]
+  ];
+  printGenericReceipt('Purchase Receipt', rows, null, 'Buying', `Receipt printed for purchase from ${b.customerName}`);
+}
+function printGirviReceipt(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+  const rows = [
+    ['Date', fmtDate(g.date)], ['Customer', g.customerName], ['Item', g.itemDesc], ['Metal', g.metal],
+    ['Weight', fmtWt(g.weight)], ['Purity', (g.purity||100)+'%'], ['Loan Amount', fmtMoney(g.loanAmount)],
+    ['Outstanding Principal', fmtMoney(principal)], ['Interest Rate', g.interestRatePct+'% / month'],
+    ['Due Date', g.dueDate?fmtDate(g.dueDate):'-'], ['Reference', g.referenceName||'-']
+  ];
+  printGenericReceipt('Girvi Receipt', rows, 'This item is held as security against the loan amount above.', 'Girvi', `Receipt printed for ${g.customerName}'s girvi`);
+}
+function printJobReceipt(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const rows = [
+    ['Date', fmtDate(j.date)], ['Customer', j.customerName], ['Job Type', j.type], ['Item', j.itemDesc],
+    ['Given to Karigar', j.karigarName||'-'], ['Weight In', fmtWt(j.weightIn)], ['Weight Out (Expected)', fmtWt(j.weightOut)],
+    ['Labour Charge', fmtMoney(j.labourCharge)], ['Expected Delivery', j.expectedDate?fmtDate(j.expectedDate):'-'], ['Status', j.status]
+  ];
+  printGenericReceipt((j.type||'Job')+' Receipt', rows, null, 'Jobs', `Receipt printed for ${j.customerName}'s ${j.type} job`);
+}
+function buildBillText(s){
+  const m = DB.meta;
+  const cust = DB.customers.find(c=>c.id===s.customerId);
+  let lines = [];
+  lines.push(`*${m.shopName}*`);
+  lines.push(m.location);
+  if(m.gstin) lines.push(`GSTIN: ${m.gstin}`);
+  lines.push('');
+  lines.push(`Bill No: *${s.billNo}*`);
+  lines.push(`Date: ${new Date(s.createdAt||s.date).toLocaleString('en-IN')}`);
+  lines.push(`Customer: ${s.customerName}${cust&&cust.phone?' ('+cust.phone+')':''}`);
+  lines.push('');
+  lines.push('Items:');
+  s.items.forEach(i=>{
+    const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
+    const pw=(i.weight||0)*(purity/100);
+    const amt=pw*(i.rate||0)+Number(i.making||0);
+    lines.push(`• ${i.itemName} — ${i.weight}g @ ${purity}% — ${fmtMoney(amt)}`);
+  });
+  lines.push('');
+  lines.push(`Subtotal: ${fmtMoney(s.subTotal)}`);
+  lines.push(`Discount: -${fmtMoney(s.discount)}`);
+  lines.push(`*Total: ${fmtMoney(s.grandTotal)}*`);
+  lines.push(`Paid (${s.paymentMode}): ${fmtMoney(s.amountPaid)}`);
+  lines.push(`Balance: ${fmtMoney(s.grandTotal-s.amountPaid)}`);
+  lines.push('');
+  lines.push('Thank you for your business!');
+  return lines.join('\n');
+}
+async function shareBill(saleId){
+  const s = DB.sales.find(x=>x.id===saleId); if(!s) return;
+  const text = buildBillText(s);
+  logHistory('Sales','Shared', `Bill ${s.billNo} shared`);
+  saveDB();
+  if(navigator.share){
+    try{
+      await navigator.share({ title: 'Bill '+s.billNo, text });
+      toast('Bill shared');
+    }catch(err){
+      if(err.name!=='AbortError') copyBillToClipboard(text);
+    }
+  } else {
+    copyBillToClipboard(text);
+  }
+}
+function copyBillToClipboard(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>{
+      toast('Bill copied — paste it into WhatsApp or any app');
+    }).catch(()=>{
+      toast('Could not share or copy — try Print instead');
+    });
+  } else {
+    toast('Sharing not supported on this browser — try Print instead');
+  }
 }
 
 /* =====================================================================
@@ -803,7 +1441,9 @@ function renderBuyTable(){
     const purity = (b.purity===undefined||b.purity==='')?100:Number(b.purity);
     const pw = (Number(b.weight)||0) * (purity/100);
     html += `<tr><td>${fmtDate(b.date)}</td><td>${b.customerName}</td><td>${b.itemDesc}</td><td>${b.metal}</td><td>${fmtWt(b.weight)}</td><td>${purity}%</td><td>${fmtWt(pw)}</td><td>${fmtMoney(b.rateApplied)}</td><td>${fmtMoney(b.amount)}</td>
-    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('purchase entry', ()=>openBuyForm('${b.id}'))">✎ Edit</button>
+    <td><button class="btn btn-sm btn-ghost" onclick="printBuyingReceipt('${b.id}')">🖨</button>
+    <button class="btn btn-sm btn-ghost" onclick="sharePdfBuying('${b.id}')">📄</button>
+    <button class="btn btn-sm btn-ghost" onclick="guardEdit('purchase entry', ()=>openBuyForm('${b.id}'))">✎ Edit</button>
     <button class="btn btn-sm btn-danger" onclick="deleteBuy('${b.id}')">🗑</button></td></tr>`;
   });
   html += `</table>`;
@@ -903,7 +1543,7 @@ function saveBuy(){
 let grPhotoData = null;
 function renderGirvi(){
   let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openGirviForm()">+ ${T('newGirvi')}</button></div>`;
-  html += `<div class="card"><div class="searchBar"><input id="girviSearch" placeholder="Search by customer name..." oninput="renderGirviTable()"></div><div id="girviTableWrap"></div></div>`;
+  html += `<div class="card"><div class="searchBar"><input id="girviSearch" placeholder="Search by name, phone, or reference..." oninput="renderGirviTable()"></div><div id="girviTableWrap"></div></div>`;
   document.getElementById('content').innerHTML = html;
   renderGirviTable();
 }
@@ -914,7 +1554,11 @@ function girviInterestDue(g){
 function renderGirviTable(){
   const q = (document.getElementById('girviSearch')?.value||'').toLowerCase();
   let rows = [...DB.girvi].filter(g=>!g.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-  if(q) rows = rows.filter(g=>g.customerName.toLowerCase().includes(q));
+  if(q) rows = rows.filter(g=>{
+    const cust = DB.customers.find(c=>c.id===g.customerId);
+    return g.customerName.toLowerCase().includes(q) || (cust&&cust.phone&&cust.phone.includes(q)) ||
+      (g.referenceName||'').toLowerCase().includes(q) || (g.itemDesc||'').toLowerCase().includes(q);
+  });
   let html = `<table><tr><th>Date</th><th>Days at Shop</th><th>Customer</th><th>Item</th><th>Wt</th><th>Principal Due</th><th>Interest/mo</th><th>Status</th><th></th></tr>`;
   if(rows.length===0) html += `<tr><td colspan="9"><div class="empty"><div class="big">🔐</div>${q?'No matching customer found.':'No girvi loans yet.'}</div></td></tr>`;
   rows.forEach(g=>{
@@ -950,6 +1594,7 @@ function openGirviForm(){
       <div class="field"><label>Loan Date <span class="helpText">(back-date allowed)</span></label><input type="date" id="grDate" value="${todayStr()}" max="${todayStr()}"></div>
       <div class="field"><label>Due Date (optional)</label><input type="date" id="grDue"></div>
     </div>
+    <div class="field" style="margin-top:12px;"><label>Reference</label><input id="grRefName" placeholder="Name of the person who referred this customer"></div>
     <div class="field" style="margin-top:12px;">
       <label>Customer Photo</label>
       <div style="display:flex;align-items:center;gap:12px;">
@@ -964,32 +1609,36 @@ function openGirviForm(){
     {label:T('save'), cls:'btn-primary', onClick:saveGirvi}
   ]);
 }
-function handleGirviPhoto(e){
-  const file = e.target.files[0]; if(!file) return;
-  if(!file.type.startsWith('image/')){ toast('Please choose an image file'); return; }
+/* Reusable: compress any uploaded/captured photo to a small JPEG data URL
+   so it can never overflow localStorage. Used by Girvi and Customer photos. */
+function compressImageFile(file, maxDim, quality, onDone, onError){
+  if(!file){ return; }
+  if(!file.type || !file.type.startsWith('image/')){ toast('Please choose an image file'); if(onError) onError(); return; }
   const reader = new FileReader();
   reader.onload = function(evt){
     const img = new Image();
     img.onload = function(){
-      const maxDim = 320;
       let w = img.width, h = img.height;
       if(w > h && w > maxDim){ h = Math.round(h * (maxDim/w)); w = maxDim; }
       else if(h >= w && h > maxDim){ w = Math.round(w * (maxDim/h)); h = maxDim; }
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      try{
-        grPhotoData = canvas.toDataURL('image/jpeg', 0.6);
-        document.getElementById('grPhotoPreview').outerHTML = `<img id="grPhotoPreview" src="${grPhotoData}" class="photoThumb">`;
-      }catch(err){
-        toast('Could not process this photo — try a different one');
-      }
+      try{ onDone(canvas.toDataURL('image/jpeg', quality)); }
+      catch(err){ toast('Could not process this photo — try a different one'); if(onError) onError(); }
     };
-    img.onerror = function(){ toast('Could not read this photo — try a different one'); };
+    img.onerror = function(){ toast('Could not read this photo — try a different one'); if(onError) onError(); };
     img.src = evt.target.result;
   };
-  reader.onerror = function(){ toast('Could not read this file'); };
+  reader.onerror = function(){ toast('Could not read this file'); if(onError) onError(); };
   reader.readAsDataURL(file);
+}
+function handleGirviPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  compressImageFile(file, 320, 0.6, (dataUrl)=>{
+    grPhotoData = dataUrl;
+    document.getElementById('grPhotoPreview').outerHTML = `<img id="grPhotoPreview" src="${grPhotoData}" class="photoThumb">`;
+  });
 }
 function saveGirvi(){
   const name = document.getElementById('grCustomer').value.trim();
@@ -1005,6 +1654,7 @@ function saveGirvi(){
     loanAmount, interestRatePct: parseFloat(document.getElementById('grInterest').value)||0,
     dueDate: document.getElementById('grDue').value||'', status:'active', photo: grPhotoData,
     outstandingPrincipal: loanAmount, lastInterestDate: gDate,
+    referenceName: document.getElementById('grRefName').value||'', forwards: [],
     transactions: [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan'}]
   };
   DB.girvi.push(g);
@@ -1030,21 +1680,94 @@ function viewGirvi(id){
       <div><b>Status:</b> ${g.status}</div>
       <div><b>Due Date:</b> ${g.dueDate?fmtDate(g.dueDate):'-'}</div>
     </div>
+    ${g.referenceName?`<div class="helpText" style="margin-bottom:10px;">🤝 <b>Referred by:</b> ${g.referenceName}</div>`:''}
     ${g.status==='active'?`<div class="approveBox">Estimated interest due since last entry: <b>${fmtMoney(girviInterestDue(g))}</b></div>`:''}
+    ${g.status==='active'?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+      <button class="btn btn-sm btn-ghost" onclick="closeModal();openGirviTxForm('${g.id}','Interest Received')">+ Interest Received</button>
+      <button class="btn btn-sm btn-ghost" onclick="closeModal();openGirviTxForm('${g.id}','Part Payment')">+ Part Payment</button>
+      <button class="btn btn-sm btn-ghost" onclick="closeModal();openGirviTxForm('${g.id}','Additional Loan')">+ Additional Loan</button>
+      <button class="btn btn-sm btn-gold" onclick="closeModal();openGirviForwardForm('${g.id}')">🏦 Forward This Rakam</button>
+    </div>`:''}
     <h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 4px;">Transaction History</h4>
     <div class="txnList">${(g.transactions||[]).filter(t=>!t.deleted).map(t=>`<div class="txnRow"><span><span class="txType">${t.type}</span> — ${fmtDate(t.date)}${t.note?' • '+t.note:''}</span><span style="display:flex;align-items:center;gap:8px;">${fmtMoney(t.amount)} <button class="btn btn-sm btn-ghost" style="padding:3px 8px;" onclick="deleteGirviTx('${g.id}','${t.id}')">🗑</button></span></div>`).join('') || '<div class="txnRow">No entries yet.</div>'}</div>
+    <h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 4px;">🏦 Forwarded to Other Shop</h4>
+    <p class="helpText" style="margin-top:0;">If you placed this customer's rakam with another shop/lender to free up cash, flag it here — this is just a note on this same girvi, it doesn't change the customer's khata.</p>
+    <div class="txnList">${(g.forwards||[]).filter(f=>!f.deleted).map(f=>`<div class="txnRow"><span>🏦 <b>${f.shopName}</b> — ${fmtMoney(f.amount)} @ ${f.percent}% — forwarded ${fmtDate(f.dateForwarded)}${f.status==='returned'?` — returned ${fmtDate(f.dateReturned)} (${fmtMoney(f.amountReturned)})`:''}${f.notes?' — '+f.notes:''}</span>
+      <span style="display:flex;align-items:center;gap:8px;">${f.status==='forwarded'?`<span class="tag tag-gold">Forwarded</span><button class="btn btn-sm btn-outline" onclick="markGirviForwardReturned('${g.id}','${f.id}')">Mark Returned</button>`:'<span class="tag tag-green">Returned</span>'}<button class="btn btn-sm btn-danger" style="padding:3px 8px;" onclick="deleteGirviForward('${g.id}','${f.id}')">🗑</button></span></div>`).join('') || '<div class="txnRow">Not forwarded to anyone — money is with you.</div>'}</div>
   `;
   const foot = [{label:'Close', cls:'btn-ghost', onClick:closeModal}];
   foot.push({label:'✎ Edit Details', cls:'btn-outline', onClick:()=>{ guardEdit('girvi loan for '+g.customerName, ()=>{ closeModal(); openGirviEditForm(g.id); }); }});
+  foot.push({label:'🖨 Print Receipt', cls:'btn-gold', onClick:()=>printGirviReceipt(g.id)});
+  foot.push({label:'📄 PDF', cls:'btn-outline', onClick:()=>sharePdfGirvi(g.id)});
   if(g.status==='active'){
-    foot.push({label:'+ Interest Received', cls:'btn-ghost', onClick:()=>{ closeModal(); openGirviTxForm(g.id,'Interest Received'); }});
-    foot.push({label:'+ Part Payment', cls:'btn-ghost', onClick:()=>{ closeModal(); openGirviTxForm(g.id,'Part Payment'); }});
-    foot.push({label:'+ Additional Loan', cls:'btn-ghost', onClick:()=>{ closeModal(); openGirviTxForm(g.id,'Additional Loan'); }});
     foot.push({label:'Redeem / Close', cls:'btn-primary', onClick:()=>{ closeModal(); redeemGirvi(g.id); }});
     foot.push({label:'Forfeit', cls:'btn-danger', onClick:()=>{ closeModal(); forfeitGirvi(g.id); }});
   }
   foot.push({label:'🗑 Delete Loan', cls:'btn-danger', onClick:()=>deleteGirvi(g.id)});
   openModal('Girvi Khata — '+g.customerName, body, foot);
+}
+function openGirviForwardForm(girviId){
+  const body = `
+    <p class="helpText" style="margin-top:0;">Record that you placed this rakam with another shop/lender because cash was short at your end.</p>
+    <div class="grid grid-2">
+      <div class="field"><label>Shop / Person Name *</label><input id="gfShop" placeholder="Who you forwarded it to"></div>
+      <div class="field"><label>Amount Forwarded</label><input type="number" id="gfAmount" placeholder="May be less than the full loan"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Interest % You Earn</label><input type="number" id="gfPercent" placeholder="e.g. 2"></div>
+      <div class="field"><label>Date Forwarded</label><input type="date" id="gfDate" value="${todayStr()}" max="${todayStr()}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="gfNotes" placeholder="Optional"></div>
+  `;
+  openModal('Forward This Rakam', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:T('save'), cls:'btn-primary', onClick:()=>saveGirviForward(girviId)}
+  ]);
+}
+function saveGirviForward(girviId){
+  const g = DB.girvi.find(x=>x.id===girviId); if(!g) return;
+  const shopName = document.getElementById('gfShop').value.trim();
+  if(!shopName){ toast('Enter the shop/person name'); return; }
+  const amount = parseFloat(document.getElementById('gfAmount').value)||0;
+  if(amount<=0){ toast('Enter a valid amount'); return; }
+  g.forwards = g.forwards || [];
+  g.forwards.push({
+    id: uid('GFWD'), shopName, amount, percent: parseFloat(document.getElementById('gfPercent').value)||0,
+    dateForwarded: document.getElementById('gfDate').value||todayStr(), notes: document.getElementById('gfNotes').value||'',
+    status:'forwarded', dateReturned:null, amountReturned:null
+  });
+  logHistory('Girvi','Forwarded', `${fmtMoney(amount)} from ${g.customerName}'s girvi forwarded to ${shopName}`);
+  saveDB(); closeModal(); toast('Marked as forwarded'); viewGirvi(girviId);
+}
+function markGirviForwardReturned(girviId, forwardId){
+  const g = DB.girvi.find(x=>x.id===girviId); if(!g) return;
+  const f = (g.forwards||[]).find(x=>x.id===forwardId); if(!f) return;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Date Returned</label><input type="date" id="gfrDate" value="${todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>Amount Returned</label><input type="number" id="gfrAmount" value="${f.amount}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="gfrNotes"></div>
+  `;
+  openModal('Mark as Returned — '+f.shopName, body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:T('save'), cls:'btn-primary', onClick:()=>{
+      f.status='returned'; f.dateReturned=document.getElementById('gfrDate').value||todayStr();
+      f.amountReturned=parseFloat(document.getElementById('gfrAmount').value)||f.amount;
+      f.notes = (f.notes?f.notes+' | ':'')+(document.getElementById('gfrNotes').value||'');
+      logHistory('Girvi','Forward Returned', `${fmtMoney(f.amountReturned)} returned from ${f.shopName} for ${g.customerName}'s girvi`);
+      saveDB(); closeModal(); toast('Marked as returned'); viewGirvi(girviId);
+    }}
+  ]);
+}
+function deleteGirviForward(girviId, forwardId){
+  const g = DB.girvi.find(x=>x.id===girviId); if(!g) return;
+  const f = (g.forwards||[]).find(x=>x.id===forwardId); if(!f) return;
+  guardDelete('forward entry ('+f.shopName+')', ()=>{
+    f.deleted = true;
+    logHistory('Girvi','Forward Deleted', `Forward entry to ${f.shopName} deleted from ${g.customerName}'s girvi`);
+    saveDB(); toast('Forward entry deleted'); viewGirvi(girviId);
+  });
 }
 function recomputeGirviPrincipal(g){
   let p = 0, lastInterest = g.date;
@@ -1068,10 +1791,21 @@ function deleteGirviTx(girviId, txId){
     saveDB(); toast('Transaction deleted'); viewGirvi(girviId);
   });
 }
+let egPhotoData = null;
 function openGirviEditForm(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  egPhotoData = g.photo || null;
   const body = `
-    <div class="grid grid-2">
+    <div class="field" style="margin-bottom:12px;">
+      <label>Customer Photo</label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        ${g.photo?`<img id="egPhotoPreview" src="${g.photo}" class="photoThumb">`:`<div id="egPhotoPreview" class="photoPlaceholder">📷</div>`}
+        <input type="file" accept="image/*" capture="environment" id="egPhotoInput" onchange="handleGirviEditPhoto(event)">
+      </div>
+      <div class="helpText">${g.photo?'Choose a new file to replace this photo.':'No photo was taken when this girvi was made — you can add one now.'}</div>
+    </div>
+    <div class="field"><label>Customer Name</label><input id="egCustName" value="${g.customerName}"></div>
+    <div class="grid grid-2" style="margin-top:12px;">
       <div class="field"><label>Item Description</label><input id="egItem" value="${g.itemDesc}"></div>
       <div class="field"><label>${T('metal')}</label><select id="egMetal"><option ${g.metal==='Silver'?'selected':''}>Silver</option><option ${g.metal==='Gold'?'selected':''}>Gold</option></select></div>
     </div>
@@ -1084,23 +1818,46 @@ function openGirviEditForm(id){
       <div class="field"><label>Loan Date</label><input type="date" id="egDate" value="${g.date}" max="${todayStr()}"></div>
       <div class="field"><label>Due Date</label><input type="date" id="egDue" value="${g.dueDate||''}"></div>
     </div>
+    <div class="field" style="margin-top:12px;"><label>Reference</label><input id="egRefName" value="${g.referenceName||''}"></div>
+    <div class="field" style="margin-top:12px;"><label>Description / Note</label><textarea id="egNotes" rows="3" placeholder="Any important detail worth remembering about this loan">${g.notes||''}</textarea></div>
     <p class="helpText" style="margin-top:10px;">To change the loan amount itself, delete the wrong transaction in the ledger and add a correct one — this keeps the ledger accurate.</p>
   `;
   openModal('Edit Girvi Details — '+g.customerName, body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:'Save Changes', cls:'btn-primary', onClick:()=>{
-      g.itemDesc = document.getElementById('egItem').value;
+      const changes = [];
+      const newName = document.getElementById('egCustName').value.trim();
+      if(newName && newName!==g.customerName){
+        const cust = DB.customers.find(x=>x.id===g.customerId);
+        if(cust){ changes.push(`name: "${cust.name}" → "${newName}"`); cust.name = newName; }
+        g.customerName = newName;
+      }
+      const newItem = document.getElementById('egItem').value;
+      if(newItem!==g.itemDesc) changes.push('item description updated');
+      g.itemDesc = newItem;
       g.metal = document.getElementById('egMetal').value;
       g.weight = parseFloat(document.getElementById('egWeight').value)||0;
       g.purity = parseFloat(document.getElementById('egPurity').value)||100;
       g.interestRatePct = parseFloat(document.getElementById('egInterest').value)||0;
       g.date = document.getElementById('egDate').value || g.date;
       g.dueDate = document.getElementById('egDue').value || '';
+      g.referenceName = document.getElementById('egRefName').value||'';
+      const newNotes = document.getElementById('egNotes').value||'';
+      if(newNotes!==g.notes) changes.push('note updated');
+      g.notes = newNotes;
+      if(egPhotoData!==g.photo){ changes.push(g.photo?'photo replaced':'photo added'); g.photo = egPhotoData; }
       if(g.transactions && g.transactions[0] && g.transactions[0].type==='Loan Given') g.transactions[0].date = g.date;
-      logHistory('Girvi','Edited', `Loan details updated for ${g.customerName} (${g.itemDesc})`);
+      logHistory('Girvi','Edited', `Loan details updated for ${g.customerName} (${g.itemDesc})${changes.length?' — '+changes.join(', '):''}`);
       saveDB(); closeModal(); toast('Girvi details updated'); renderGirvi();
     }}
   ]);
+}
+function handleGirviEditPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  compressImageFile(file, 320, 0.6, (dataUrl)=>{
+    egPhotoData = dataUrl;
+    document.getElementById('egPhotoPreview').outerHTML = `<img id="egPhotoPreview" src="${egPhotoData}" class="photoThumb">`;
+  });
 }
 function deleteGirvi(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
@@ -1168,23 +1925,57 @@ function forfeitGirvi(id){
    PAGE: CREDIT / UDHAAR
 ===================================================================== */
 function renderCredit(){
-  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openCreditForm()">+ Add Entry</button></div>`;
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><div style="display:flex;gap:10px;">
+    <button class="btn btn-outline" onclick="openAddCreditCustomerForm()">+ Mark Customer as Credit</button>
+    <button class="btn btn-primary" onclick="openCreditForm()">+ Add Entry</button>
+  </div></div>`;
+  const creditCustomers = DB.customers.filter(c=>c.creditEnabled);
   html += `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">`;
-  const totalDue = DB.customers.reduce((a,c)=>a+Math.max(customerBalance(c.id),0),0);
-  const customersWithDue = DB.customers.filter(c=>customerBalance(c.id)>0).length;
+  const totalDue = creditCustomers.reduce((a,c)=>a+Math.max(customerBalance(c.id),0),0);
+  const customersWithDue = creditCustomers.filter(c=>customerBalance(c.id)>0).length;
   html += `<div class="statCard"><div class="lbl">Total Outstanding</div><div class="val">${fmtMoney(totalDue)}</div></div>`;
   html += `<div class="statCard"><div class="lbl">Customers with Due</div><div class="val">${customersWithDue}</div></div>`;
-  html += `<div class="statCard"><div class="lbl">Total Customers</div><div class="val">${DB.customers.length}</div></div>`;
+  html += `<div class="statCard"><div class="lbl">Credit Customers</div><div class="val">${creditCustomers.length}</div></div>`;
   html += `</div>`;
+  html += `<p class="helpText" style="margin-bottom:10px;">Only customers you've intentionally marked for credit show here — not your full customer list.</p>`;
   html += `<div class="card"><table><tr><th>Customer</th><th>Phone</th><th>Balance Due</th><th></th></tr>`;
-  const withBal = DB.customers.map(c=>({c,bal:customerBalance(c.id)})).sort((a,b)=>b.bal-a.bal);
-  if(withBal.length===0) html += `<tr><td colspan="4"><div class="empty"><div class="big">📒</div>No customers yet.</div></td></tr>`;
+  const withBal = creditCustomers.map(c=>({c,bal:customerBalance(c.id)})).sort((a,b)=>b.bal-a.bal);
+  if(withBal.length===0) html += `<tr><td colspan="4"><div class="empty"><div class="big">📒</div>No credit customers yet. Tap "+ Mark Customer as Credit" to add one.</div></td></tr>`;
   withBal.forEach(({c,bal})=>{
     html += `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
-    <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View Ledger</button></td></tr>`;
+    <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View Ledger</button>
+    <button class="btn btn-sm btn-danger" onclick="unmarkCreditCustomer('${c.id}')">Remove from Credit</button></td></tr>`;
   });
   html += `</table></div>`;
   document.getElementById('content').innerHTML = html;
+}
+function openAddCreditCustomerForm(){
+  const eligible = DB.customers.filter(c=>!c.creditEnabled);
+  const body = `
+    <div class="field"><label>${T('customer')} *</label><input list="custListCr" id="acCustomer" placeholder="Type or select a customer">
+    <datalist id="custListCr">${eligible.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+    <p class="helpText" style="margin-top:10px;">This just marks them as a credit account — you can still add their first credit entry right after.</p>
+  `;
+  openModal('Mark Customer as Credit', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Mark as Credit', cls:'btn-primary', onClick:()=>{
+      const name = document.getElementById('acCustomer').value.trim();
+      if(!name){ toast('Enter a customer name'); return; }
+      const cust = findOrCreateCustomer(name,'');
+      cust.creditEnabled = true;
+      logHistory('Customer','Credit Enabled', name+' marked as a credit customer');
+      saveDB(); closeModal(); toast(name+' marked as credit customer'); renderCredit();
+    }}
+  ]);
+}
+function unmarkCreditCustomer(id){
+  const c = DB.customers.find(x=>x.id===id); if(!c) return;
+  const bal = customerBalance(id);
+  confirmAction(`Remove ${c.name} from the credit list? ${bal>0?'They currently have an outstanding balance of '+fmtMoney(bal)+' — their records stay safe, this only removes them from this view.':'Their credit records stay safe — this only removes them from this view.'}`, ()=>{
+    c.creditEnabled = false;
+    logHistory('Customer','Credit Disabled', c.name+' removed from credit list');
+    saveDB(); renderCredit(); toast('Removed from credit list');
+  });
 }
 function openCreditForm(prefillName){
   const body = `
@@ -1212,6 +2003,7 @@ function saveCredit(){
   const type = document.getElementById('crType').value;
   const crDate = document.getElementById('crDate').value || todayStr();
   DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:crDate, type, amount:amt, description:document.getElementById('crDesc').value||'Manual entry', createdAt:nowISO()});
+  if(!cust.creditEnabled){ cust.creditEnabled = true; logHistory('Customer','Credit Enabled', cust.name+' auto-marked as credit customer (first entry created)'); }
   logHistory('Credit','Created', `${type==='debit'?'Udhaar added':'Payment received'} — ${fmtMoney(amt)} (${cust.name})`);
   saveDB(); closeModal(); toast('Entry saved'); renderCredit();
 }
@@ -1228,22 +2020,53 @@ function renderInventory(){
 function renderInvTable(){
   const q = (document.getElementById('invSearch')?.value||'').toLowerCase();
   let rows = [...DB.inventory].filter(i=>!i.deleted).sort((a,b)=>b.addedDate.localeCompare(a.addedDate));
-  if(q) rows = rows.filter(i=>i.itemName.toLowerCase().includes(q) || i.code.toLowerCase().includes(q));
-  let html = `<table><tr><th>Code</th><th>Item</th><th>Category</th><th>Wt</th><th>Purity</th><th>Qty</th><th>Status</th><th></th></tr>`;
+  if(q) rows = rows.filter(i=> [i.itemName,i.code,i.subcategory,i.designGroup,i.style,i.batchNo,i.karigarSource].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
+  let html = `<table><tr><th>Code</th><th>Item</th><th>Category / Variant</th><th>Wt</th><th>Purity</th><th>Qty</th><th>Status</th><th></th></tr>`;
   if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">💍</div>No inventory items yet.</div></td></tr>`;
   rows.forEach(i=>{
-    html += `<tr><td>${i.code}</td><td>${i.itemName}</td><td>${i.category}</td><td>${fmtWt(i.weight)}</td><td>${i.purity}</td><td>${i.qty}</td>
+    const variantBits = [i.subcategory,i.designGroup,i.size,i.pairSingle,i.style,i.stoneOrNot].filter(Boolean);
+    html += `<tr><td>${i.code}</td><td>${i.itemName}${i.pieceCount>1?' ('+i.pieceCount+' pc)':''}</td><td>${i.category}${variantBits.length?'<br><span class="helpText">'+variantBits.join(' • ')+'</span>':''}</td><td>${fmtWt(i.weight)}</td><td>${i.purity}</td><td>${i.qty}</td>
     <td>${i.status==='in-stock'?'<span class="tag tag-green">In Stock</span>':'<span class="tag tag-gray">Sold</span>'}</td>
     <td>${i.status==='in-stock'?`<button class="btn btn-sm btn-outline" onclick="markSold('${i.id}')">Mark Sold</button>`:''}
+    <button class="btn btn-sm btn-ghost" onclick="viewInvDetails('${i.id}')">👁</button>
     <button class="btn btn-sm btn-ghost" onclick="guardEdit('inventory item', ()=>openInvForm('${i.id}'))">✎</button>
     <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">🗑</button></td></tr>`;
   });
   html += `</table>`;
   document.getElementById('invTableWrap').innerHTML = html;
 }
+function viewInvDetails(id){
+  const i = DB.inventory.find(x=>x.id===id); if(!i) return;
+  const rows = [
+    ['Code', i.code], ['Item Name', i.itemName], ['Category', i.category], ['Subcategory', i.subcategory],
+    ['Design Group', i.designGroup], ['Size', i.size], ['Pair / Single', i.pairSingle], ['Style', i.style],
+    ['Stone', i.stoneOrNot], ['Custom Attributes', i.customAttr], ['Batch / Lot No.', i.batchNo],
+    ['Karigar Source', i.karigarSource], ['Weight Type', i.weightType], ['Piece Count', i.pieceCount],
+    ['Weight', fmtWt(i.weight)], ['Purity', i.purity], ['Qty', i.qty], ['Remarks', i.remarks], ['Status', i.status]
+  ].filter(([k,v])=> v!==undefined && v!==null && v!=='');
+  let body = `<table>${rows.map(([k,v])=>`<tr><td style="font-weight:600;width:40%;">${k}</td><td>${v}</td></tr>`).join('')}</table>`;
+  if(i.sourceType==='Wholesaler Made' && i.billingPurity){
+    const w = DB.wholesalers.find(x=>x.id===i.wholesalerId);
+    const weight = Number(i.weight)||0, billingPurity = Number(i.billingPurity)||0, making = Number(i.wholesalerMakingPerGram)||0;
+    let rate = Number(i.wholesalerRateUsed);
+    if(!rate) rate = i.category==='Gold' ? DB.currentRates.gold22/10 : DB.currentRates.silverKg/1000;
+    const billedWeight = weight*(billingPurity/100);
+    const totalCost = billedWeight*rate + weight*making;
+    body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 8px;">🏭 Wholesaler Making Cost</h4>
+      <table>
+        <tr><td style="font-weight:600;width:40%;">Wholesaler</td><td>${w?w.name:'-'}</td></tr>
+        <tr><td style="font-weight:600;">Actual Purity</td><td>${i.actualPurity||'-'}%</td></tr>
+        <tr><td style="font-weight:600;">Billed At Purity</td><td>${billingPurity}%</td></tr>
+        <tr><td style="font-weight:600;">Making</td><td>${fmtMoney(making)}/g</td></tr>
+        <tr><td style="font-weight:600;">Your Total Cost</td><td><b>${fmtMoney(totalCost)}</b></td></tr>
+      </table>`;
+  }
+  openModal(i.itemName+' — Details', body, [{label:'Close', cls:'btn-ghost', onClick:closeModal}]);
+}
 function openInvForm(id){
   const item = id ? DB.inventory.find(x=>x.id===id) : null;
   const code = item ? item.code : 'GJ-' + (DB.inventory.length+1001);
+  const v = (f,d)=> item&&item[f]!==undefined?item[f]:(d||'');
   const body = `
     <div class="grid grid-2">
       <div class="field"><label>Item Code</label><input id="invCode" value="${code}"></div>
@@ -1253,26 +2076,106 @@ function openInvForm(id){
         <option ${item&&item.category==='Other'?'selected':''}>Other</option>
       </select></div>
     </div>
-    <div class="field" style="margin-top:12px;"><label>Item Name</label><input id="invName" placeholder="e.g. Silver Kada 50g" value="${item?item.itemName:''}"></div>
+    <div class="field" style="margin-top:12px;"><label>Item Name</label><input id="invName" placeholder="e.g. Silver Payal" value="${item?item.itemName:''}"></div>
     <div class="grid grid-3" style="margin-top:12px;">
       <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="invWeight" value="${item?item.weight:''}"></div>
       <div class="field"><label>${T('purity')}</label><input id="invPurity" value="${item?item.purity:''}"></div>
       <div class="field"><label>Qty</label><input type="number" id="invQty" value="${item?item.qty:1}"></div>
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">Optional — useful for variant-heavy items like payal, bangles, rings where many sub-types exist.</p>
+      <div class="grid grid-3">
+        <div class="field"><label>Subcategory</label><input id="invSubcat" placeholder="e.g. Payal Type A" value="${v('subcategory')}"></div>
+        <div class="field"><label>Design Group</label><input id="invDesignGroup" placeholder="e.g. Heavy / Light" value="${v('designGroup')}"></div>
+        <div class="field"><label>Size</label><input id="invSize" placeholder="e.g. Free size, 2.6" value="${v('size')}"></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:12px;">
+        <div class="field"><label>Pair / Single</label><select id="invPairSingle"><option value="">-</option><option ${v('pairSingle')==='Pair'?'selected':''}>Pair</option><option ${v('pairSingle')==='Single'?'selected':''}>Single</option></select></div>
+        <div class="field"><label>Style</label><input id="invStyle" placeholder="e.g. Traditional, Antique" value="${v('style')}"></div>
+        <div class="field"><label>Stone Work</label><select id="invStoneOrNot"><option value="">-</option><option ${v('stoneOrNot')==='Stone Work'?'selected':''}>Stone Work</option><option ${v('stoneOrNot')==='Plain / No Stone'?'selected':''}>Plain / No Stone</option></select></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:12px;">
+        <div class="field"><label>Weight Type</label><select id="invWeightType"><option value="">-</option><option ${v('weightType')==='Gross'?'selected':''}>Gross</option><option ${v('weightType')==='Net'?'selected':''}>Net</option></select></div>
+        <div class="field"><label>Piece Count</label><input type="number" id="invPieceCount" value="${item?item.pieceCount:1}"></div>
+        <div class="field"><label>Batch / Lot No.</label><input id="invBatchNo" value="${v('batchNo')}"></div>
+      </div>
+      <div class="grid grid-2" style="margin-top:12px;">
+        <div class="field"><label>Karigar Source</label><input id="invKarigarSource" placeholder="Who made/supplied it" value="${v('karigarSource')}"></div>
+        <div class="field"><label>Custom Attributes</label><input id="invCustomAttr" placeholder="Anything else, free text" value="${v('customAttr')}"></div>
+      </div>
+      <div class="field" style="margin-top:12px;"><label>Remarks</label><input id="invRemarks" value="${v('remarks')}"></div>
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">🏭 <b>Wholesaler Making Cost</b> — if this item was got made through a wholesaler who bills you at a different purity than the item's actual purity (plus a making charge), record it here to see your true cost.</p>
+      <div class="grid grid-2">
+        <div class="field"><label>Source</label><select id="invSourceType" onchange="toggleInvWholesalerFields()">
+          <option value="" ${!v('sourceType')?'selected':''}>-</option>
+          <option value="Own Stock" ${v('sourceType')==='Own Stock'?'selected':''}>Own Stock / Self Made</option>
+          <option value="Wholesaler Made" ${v('sourceType')==='Wholesaler Made'?'selected':''}>Made via Wholesaler</option>
+        </select></div>
+        <div class="field"><label>Wholesaler</label><select id="invWholesalerId">
+          <option value="">-</option>
+          ${DB.wholesalers.filter(w=>!w.deleted).map(w=>`<option value="${w.id}" ${v('wholesalerId')===w.id?'selected':''}>${w.name}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:12px;">
+        <div class="field"><label>Actual Purity %</label><input type="number" id="invActualPurity" placeholder="e.g. 58" value="${v('actualPurity')}" oninput="recalcInvCost()"></div>
+        <div class="field"><label>Purity You're Billed At %</label><input type="number" id="invBillingPurity" placeholder="e.g. 70" value="${v('billingPurity')}" oninput="recalcInvCost()"></div>
+        <div class="field"><label>Making (₹/gram)</label><input type="number" id="invWholesalerMaking" placeholder="e.g. 10" value="${v('wholesalerMakingPerGram')}" oninput="recalcInvCost()"></div>
+      </div>
+      <div class="field" style="margin-top:12px;max-width:220px;"><label>Rate Used for Costing (₹/g)</label><input type="number" id="invWholesalerRate" placeholder="defaults to today's rate" value="${v('wholesalerRateUsed')}" oninput="recalcInvCost()"></div>
+      <div id="invCostOut" class="totalsBox" style="margin-top:12px;"></div>
     </div>
   `;
   openModal(item?'Edit Inventory Item':'Add Inventory Item', body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:item?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveInv(id)}
   ]);
+  recalcInvCost();
+}
+function toggleInvWholesalerFields(){ /* placeholder for future conditional show/hide; fields stay visible for simplicity */ }
+function recalcInvCost(){
+  const out = document.getElementById('invCostOut'); if(!out) return;
+  const weight = parseFloat(document.getElementById('invWeight')?.value)||0;
+  const billingPurity = parseFloat(document.getElementById('invBillingPurity')?.value);
+  const making = parseFloat(document.getElementById('invWholesalerMaking')?.value)||0;
+  let rate = parseFloat(document.getElementById('invWholesalerRate')?.value);
+  if(!rate){
+    const cat = document.getElementById('invCategory')?.value;
+    rate = cat==='Gold' ? DB.currentRates.gold22/10 : DB.currentRates.silverKg/1000;
+  }
+  if(!weight || isNaN(billingPurity)){ out.innerHTML = `<p class="helpText" style="margin:0;">Fill weight and billed purity to see your cost.</p>`; return; }
+  const billedWeight = weight*(billingPurity/100);
+  const metalCost = billedWeight*rate;
+  const makingCost = weight*making;
+  const totalCost = metalCost+makingCost;
+  out.innerHTML = `
+    <div class="totalsRow"><span>Billed Weight (${billingPurity}% of ${weight}g)</span><span>${fmtWt(billedWeight)}</span></div>
+    <div class="totalsRow"><span>Metal Cost</span><span>${fmtMoney(metalCost)}</span></div>
+    <div class="totalsRow"><span>Making Cost</span><span>${fmtMoney(makingCost)}</span></div>
+    <div class="totalsRow grand"><span>Your Total Cost</span><span>${fmtMoney(totalCost)}</span></div>
+  `;
 }
 function saveInv(id){
   const name = document.getElementById('invName').value;
   if(!name){ toast('Enter item name'); return; }
+  const extra = {
+    subcategory: document.getElementById('invSubcat').value, designGroup: document.getElementById('invDesignGroup').value,
+    size: document.getElementById('invSize').value, pairSingle: document.getElementById('invPairSingle').value,
+    style: document.getElementById('invStyle').value, stoneOrNot: document.getElementById('invStoneOrNot').value,
+    weightType: document.getElementById('invWeightType').value, pieceCount: parseInt(document.getElementById('invPieceCount').value)||1,
+    batchNo: document.getElementById('invBatchNo').value, karigarSource: document.getElementById('invKarigarSource').value,
+    customAttr: document.getElementById('invCustomAttr').value, remarks: document.getElementById('invRemarks').value,
+    sourceType: document.getElementById('invSourceType').value, wholesalerId: document.getElementById('invWholesalerId').value,
+    actualPurity: document.getElementById('invActualPurity').value, billingPurity: document.getElementById('invBillingPurity').value,
+    wholesalerMakingPerGram: document.getElementById('invWholesalerMaking').value, wholesalerRateUsed: document.getElementById('invWholesalerRate').value
+  };
   if(id){
     const item = DB.inventory.find(x=>x.id===id); if(!item) return;
     item.code=document.getElementById('invCode').value; item.category=document.getElementById('invCategory').value;
     item.itemName=name; item.weight=parseFloat(document.getElementById('invWeight').value)||0;
     item.purity=document.getElementById('invPurity').value; item.qty=parseInt(document.getElementById('invQty').value)||1;
+    Object.assign(item, extra);
     logHistory('Inventory','Edited', `${item.itemName} (${item.code}) edited`);
     saveDB(); closeModal(); toast('Item updated'); renderInventory();
     return;
@@ -1281,7 +2184,7 @@ function saveInv(id){
     id:uid('INV'), code:document.getElementById('invCode').value, category:document.getElementById('invCategory').value,
     itemName:name, weight:parseFloat(document.getElementById('invWeight').value)||0,
     purity:document.getElementById('invPurity').value, qty:parseInt(document.getElementById('invQty').value)||1,
-    status:'in-stock', addedDate: todayStr()
+    status:'in-stock', addedDate: todayStr(), ...extra
   };
   DB.inventory.push(item);
   logHistory('Inventory','Added', `${item.itemName} (${item.code}) added to stock`);
@@ -1322,11 +2225,11 @@ function renderJobsTable(){
   const map = {'Pending':'pending','In Progress':'in-progress','Ready':'ready','Delivered':'delivered'};
   let rows = [...DB.jobs].filter(j=>!j.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   if(f!=='All') rows = rows.filter(j=>j.status===map[f]);
-  let html = `<table><tr><th>Date</th><th>Customer</th><th>Type</th><th>Item</th><th>Wt In/Out</th><th>Labour</th><th>Status</th><th></th></tr>`;
-  if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">🛠️</div>No jobs found.</div></td></tr>`;
+  let html = `<table><tr><th>Date</th><th>Customer</th><th>Type</th><th>Item</th><th>Karigar</th><th>Wt In/Out</th><th>Labour</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="9"><div class="empty"><div class="big">🛠️</div>No jobs found.</div></td></tr>`;
   rows.forEach(j=>{
     const statusTag = {pending:'tag-gold','in-progress':'tag-gold',ready:'tag-green',delivered:'tag-gray'}[j.status];
-    html += `<tr><td>${fmtDate(j.date)}</td><td>${j.customerName}</td><td>${j.type}</td><td>${j.itemDesc}</td>
+    html += `<tr><td>${fmtDate(j.date)}</td><td>${j.customerName}</td><td>${j.type}</td><td>${j.itemDesc}</td><td>${j.karigarName||'-'}</td>
     <td>${fmtWt(j.weightIn)} / ${fmtWt(j.weightOut)}</td><td>${fmtMoney(j.labourCharge)}</td>
     <td><span class="tag ${statusTag}">${j.status}</span></td>
     <td><select onchange="updateJobStatus('${j.id}', this.value)">
@@ -1335,6 +2238,8 @@ function renderJobsTable(){
       <option value="ready" ${j.status==='ready'?'selected':''}>Ready</option>
       <option value="delivered" ${j.status==='delivered'?'selected':''}>Delivered</option>
     </select>
+    <button class="btn btn-sm btn-ghost" onclick="printJobReceipt('${j.id}')">🖨</button>
+    <button class="btn btn-sm btn-ghost" onclick="sharePdfJob('${j.id}')">📄</button>
     <button class="btn btn-sm btn-ghost" onclick="guardEdit('job', ()=>openJobForm('${j.id}'))">✎</button>
     <button class="btn btn-sm btn-danger" onclick="deleteJob('${j.id}')">🗑</button></td></tr>`;
   });
@@ -1356,6 +2261,7 @@ function openJobForm(id){
       <div class="field"><label>Job Type</label><select id="jbType"><option ${j&&j.type==='Manufacturing'?'selected':''}>Manufacturing</option><option ${j&&j.type==='Repair'?'selected':''}>Repair</option></select></div>
     </div>
     <div class="field" style="margin-top:12px;"><label>Item Description</label><input id="jbItem" placeholder="e.g. New silver ring from old chain" value="${j?j.itemDesc:''}"></div>
+    <div class="field" style="margin-top:12px;"><label>Given to Karigar (optional)</label><input id="jbKarigar" placeholder="Karigar's name, if job given out" value="${j?j.karigarName||'':''}"></div>
     <div class="grid grid-3" style="margin-top:12px;">
       <div class="field"><label>Weight In (g)</label><input type="number" step="0.001" id="jbWtIn" value="${j?j.weightIn:''}"></div>
       <div class="field"><label>Expected Weight Out (g)</label><input type="number" step="0.001" id="jbWtOut" value="${j?j.weightOut:''}"></div>
@@ -1368,6 +2274,8 @@ function openJobForm(id){
   `;
   openModal(j?'Edit Job':T('newJob'), body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'🖨 Print Receipt', cls:'btn-gold', onClick:()=>{ if(id){ closeModal(); printJobReceipt(id); } else toast('Save the job first, then print'); }},
+    {label:'📄 PDF', cls:'btn-outline', onClick:()=>{ if(id){ closeModal(); sharePdfJob(id); } else toast('Save the job first, then share'); }},
     {label:j?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveJob(id)}
   ]);
 }
@@ -1375,10 +2283,11 @@ function saveJob(id){
   const name = document.getElementById('jbCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
   const cust = findOrCreateCustomer(name,'');
+  const karigarName = document.getElementById('jbKarigar').value||'';
   if(id){
     const j = DB.jobs.find(x=>x.id===id); if(!j) return;
     j.customerId=cust.id; j.customerName=cust.name; j.type=document.getElementById('jbType').value;
-    j.itemDesc=document.getElementById('jbItem').value; j.weightIn=parseFloat(document.getElementById('jbWtIn').value)||0;
+    j.itemDesc=document.getElementById('jbItem').value; j.karigarName=karigarName; j.weightIn=parseFloat(document.getElementById('jbWtIn').value)||0;
     j.weightOut=parseFloat(document.getElementById('jbWtOut').value)||0; j.labourCharge=parseFloat(document.getElementById('jbLabour').value)||0;
     j.date=document.getElementById('jbDate').value||j.date; j.expectedDate=document.getElementById('jbExpected').value||'';
     logHistory('Jobs','Edited', `${j.type} job for ${cust.name} edited: ${j.itemDesc}`);
@@ -1387,7 +2296,7 @@ function saveJob(id){
   }
   const j = {
     id:uid('JOB'), date:document.getElementById('jbDate')?.value||todayStr(), createdAt:nowISO(), customerId:cust.id, customerName:cust.name,
-    type:document.getElementById('jbType').value, itemDesc:document.getElementById('jbItem').value,
+    type:document.getElementById('jbType').value, itemDesc:document.getElementById('jbItem').value, karigarName,
     weightIn:parseFloat(document.getElementById('jbWtIn').value)||0, weightOut:parseFloat(document.getElementById('jbWtOut').value)||0,
     labourCharge:parseFloat(document.getElementById('jbLabour').value)||0, expectedDate:document.getElementById('jbExpected').value||'',
     status:'pending'
@@ -1482,23 +2391,33 @@ function deleteEx(id){
    PAGE: CUSTOMER LEDGER
 ===================================================================== */
 function renderLedger(){
-  let html = `<div class="card"><div class="searchBar"><input id="ledgerSearch" placeholder="Search customer..." oninput="renderLedgerList()"></div><div id="ledgerListWrap"></div></div>`;
+  let html = `<div class="card"><div class="searchBar"><input id="ledgerSearch" placeholder="Search by name or phone..." oninput="renderLedgerList()"></div><div id="ledgerListWrap"></div></div>`;
   document.getElementById('content').innerHTML = html;
   renderLedgerList();
 }
 function renderLedgerList(){
   const q=(document.getElementById('ledgerSearch')?.value||'').toLowerCase();
-  let rows = [...DB.customers].filter(c=>c.name.toLowerCase().includes(q));
-  let html = `<table><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Sales</th><th>Girvi</th><th></th></tr>`;
-  if(rows.length===0) html+=`<tr><td colspan="6"><div class="empty"><div class="big">👤</div>No customers found.</div></td></tr>`;
+  let rows = [...DB.customers].filter(c=>c.name.toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.village||'').toLowerCase().includes(q));
+  let html = `<table><tr><th></th><th>Name</th><th>Phone</th><th>Village</th><th>Balance</th><th>Sales</th><th>Girvi</th><th></th></tr>`;
+  if(rows.length===0) html+=`<tr><td colspan="8"><div class="empty"><div class="big">👤</div>No customers found.</div></td></tr>`;
   rows.forEach(c=>{
     const bal=customerBalance(c.id);
-    html += `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
+    html += `<tr><td>${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:32px;height:32px;">`:'<div class="photoPlaceholder" style="width:32px;height:32px;font-size:13px;">👤</div>'}</td>
+    <td>${c.name}${c.tags?' <span class="tag tag-gold" style="margin-left:4px;">'+c.tags+'</span>':''}</td><td>${c.phone||'-'}</td><td>${c.village||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
     <td>${DB.sales.filter(s=>s.customerId===c.id && !s.deleted).length}</td><td>${DB.girvi.filter(g=>g.customerId===c.id && g.status==='active' && !g.deleted).length}</td>
     <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View</button></td></tr>`;
   });
   html += `</table>`;
   document.getElementById('ledgerListWrap').innerHTML = html;
+}
+function customerLastVisit(id){
+  const dates = [];
+  DB.sales.filter(s=>s.customerId===id && !s.deleted).forEach(s=>dates.push(s.date));
+  DB.girvi.filter(g=>g.customerId===id && !g.deleted).forEach(g=>dates.push(g.date));
+  DB.creditEntries.filter(e=>e.customerId===id && !e.deleted).forEach(e=>dates.push(e.date));
+  DB.jobs.filter(j=>j.customerId===id && !j.deleted).forEach(j=>dates.push(j.date));
+  if(dates.length===0) return null;
+  return dates.sort().reverse()[0];
 }
 function viewCustomerLedger(id){
   const c = DB.customers.find(x=>x.id===id); if(!c) return;
@@ -1506,21 +2425,100 @@ function viewCustomerLedger(id){
   const girvi = DB.girvi.filter(g=>g.customerId===id && !g.deleted);
   const credit = DB.creditEntries.filter(e=>e.customerId===id && !e.deleted);
   const jobs = DB.jobs.filter(j=>j.customerId===id && !j.deleted);
-  let body = `<div class="grid grid-2" style="margin-bottom:10px;"><div><b>Phone:</b> ${c.phone||'-'}</div><div><b>Balance:</b> ${fmtMoney(customerBalance(id))}</div></div>`;
-  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);">Sales (${sales.length})</h4>`;
-  body += sales.length ? `<table><tr><th>Date</th><th>Bill</th><th>Total</th><th>Balance</th></tr>${sales.map(s=>`<tr><td>${fmtDate(s.date)}</td><td>${s.billNo}</td><td>${fmtMoney(s.grandTotal)}</td><td>${fmtMoney(s.grandTotal-s.amountPaid)}</td></tr>`).join('')}</table>` : `<p class="helpText">No sales yet.</p>`;
-  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:16px;">Girvi Loans (${girvi.length})</h4>`;
-  body += girvi.length ? `<table><tr><th>Item</th><th>Loan</th><th>Status</th></tr>${girvi.map(g=>`<tr><td>${g.itemDesc}</td><td>${fmtMoney(g.loanAmount)}</td><td>${g.status}</td></tr>`).join('')}</table>` : `<p class="helpText">None.</p>`;
-  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:16px;">Credit Entries (${credit.length})</h4>`;
-  body += credit.length ? `<table><tr><th>Date</th><th>Type</th><th>Amount</th><th>Note</th><th></th></tr>${credit.map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.type}</td><td>${fmtMoney(e.amount)}</td><td>${e.description}</td>
+  const lastVisit = customerLastVisit(id);
+  const totalTxns = sales.length + girvi.length + jobs.length;
+  const isFrequent = totalTxns >= 3;
+
+  let timeline = [];
+  sales.forEach(s=>timeline.push({date:s.date, ts:s.createdAt, icon:'🧾', text:`Sale ${s.billNo} — ${fmtMoney(s.grandTotal)}`}));
+  girvi.forEach(g=>timeline.push({date:g.date, ts:g.createdAt, icon:'🔐', text:`Girvi loan — ${g.itemDesc} — ${fmtMoney(g.loanAmount)} (${g.status})`}));
+  credit.forEach(e=>timeline.push({date:e.date, ts:e.createdAt, icon:'📒', text:`${e.type==='debit'?'Udhaar given':'Payment received'} — ${fmtMoney(e.amount)}${e.description?' — '+e.description:''}`}));
+  jobs.forEach(j=>timeline.push({date:j.date, ts:j.createdAt, icon:'🛠️', text:`${j.type} job — ${j.itemDesc} (${j.status})`}));
+  timeline.sort((a,b)=> b.date.localeCompare(a.date) || (b.ts||'').localeCompare(a.ts||''));
+
+  let body = `
+    <div class="girviDetailHead" style="margin-bottom:14px;">
+      ${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:72px;height:72px;">`:`<div class="photoPlaceholder" style="width:72px;height:72px;font-size:26px;">👤</div>`}
+      <div>
+        <div style="font-family:var(--font-display);font-size:19px;color:var(--maroon-dark);">${c.name} ${c.tags?'<span class="tag tag-gold">'+c.tags+'</span>':''}${isFrequent?' <span class="tag tag-green">Frequent</span>':''}${c.creditEnabled?' <span class="tag tag-gray">Credit A/C</span>':''}</div>
+        <div class="helpText">${c.phone||'No phone on file'}${c.village?' • '+c.village:''}</div>
+        <div class="helpText">Last visit: ${lastVisit?fmtDate(lastVisit):'-'} • Balance: <b style="color:${customerBalance(id)>0?'var(--danger)':'var(--success)'}">${fmtMoney(customerBalance(id))}</b></div>
+      </div>
+    </div>
+    ${(c.referredBy||c.familyLink)?`<div class="approveBox" style="background:var(--gold-pale);border-color:var(--gold-light);color:var(--maroon-dark);margin-bottom:12px;">
+      ${c.referredBy?`🤝 <b>Referred by:</b> ${c.referredBy}<br>`:''}${c.familyLink?`👪 <b>Family / relation:</b> ${c.familyLink}`:''}
+    </div>`:''}
+    ${c.notes?`<div class="helpText" style="margin-bottom:12px;">📝 ${c.notes}</div>`:''}
+    <div class="statGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+      <div class="statCard" style="padding:12px;"><div class="lbl">Sales</div><div class="val" style="font-size:20px;">${sales.length}</div></div>
+      <div class="statCard" style="padding:12px;border-color:var(--silver-accent)"><div class="lbl">Girvi</div><div class="val" style="font-size:20px;">${girvi.length}</div></div>
+      <div class="statCard" style="padding:12px;border-color:var(--danger)"><div class="lbl">Credit</div><div class="val" style="font-size:20px;">${credit.length}</div></div>
+      <div class="statCard" style="padding:12px;border-color:var(--success)"><div class="lbl">Jobs</div><div class="val" style="font-size:20px;">${jobs.length}</div></div>
+    </div>
+    <h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:0 0 8px;">Timeline</h4>
+    <div class="txnList">${timeline.slice(0,40).map(t=>`<div class="txnRow"><span>${t.icon} ${t.text}</span><span class="helpText">${fmtDate(t.date)}</span></div>`).join('') || '<div class="txnRow">No activity yet.</div>'}</div>
+    <h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 4px;">Credit Entries (${credit.length})</h4>
+    ${credit.length ? `<table><tr><th>Date</th><th>Type</th><th>Amount</th><th>Note</th><th></th></tr>${credit.map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.type}</td><td>${fmtMoney(e.amount)}</td><td>${e.description}</td>
     <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('credit entry', ()=>openCreditEditForm('${e.id}','${id}'))">✎</button>
-    <button class="btn btn-sm btn-danger" onclick="deleteCreditEntry('${e.id}','${id}')">🗑</button></td></tr>`).join('')}</table>` : `<p class="helpText">None.</p>`;
-  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:16px;">Jobs (${jobs.length})</h4>`;
-  body += jobs.length ? `<table><tr><th>Item</th><th>Type</th><th>Status</th></tr>${jobs.map(j=>`<tr><td>${j.itemDesc}</td><td>${j.type}</td><td>${j.status}</td></tr>`).join('')}</table>` : `<p class="helpText">None.</p>`;
-  openModal(c.name+' — Ledger', body, [
+    <button class="btn btn-sm btn-danger" onclick="deleteCreditEntry('${e.id}','${id}')">🗑</button></td></tr>`).join('')}</table>` : `<p class="helpText">${c.creditEnabled?'No credit entries yet.':'Not a credit customer — mark them in Edit Profile if you want to track udhaar for them.'}</p>`}
+  `;
+  openModal(c.name+' — Profile', body, [
     {label:'Close', cls:'btn-ghost', onClick:closeModal},
+    {label:'✎ Edit Profile', cls:'btn-outline', onClick:()=>{ closeModal(); openCustomerProfileForm(id); }},
     {label:'+ Add Credit Entry', cls:'btn-outline', onClick:()=>{ closeModal(); openCreditForm(c.name); }}
   ]);
+}
+let custPhotoData = null;
+function openCustomerProfileForm(id){
+  const c = DB.customers.find(x=>x.id===id); if(!c) return;
+  custPhotoData = c.photo || null;
+  const body = `
+    <div class="field" style="margin-bottom:12px;">
+      <label>Photo</label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        ${c.photo?`<img id="custPhotoPreview" src="${c.photo}" class="photoThumb">`:`<div id="custPhotoPreview" class="photoPlaceholder">👤</div>`}
+        <input type="file" accept="image/*" capture="environment" id="custPhotoInput" onchange="handleCustomerPhoto(event)">
+      </div>
+    </div>
+    <div class="grid grid-2">
+      <div class="field"><label>Name</label><input id="cpName" value="${c.name}"></div>
+      <div class="field"><label>${T('phone')}</label><input id="cpPhone" value="${c.phone||''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Village / Locality</label><input id="cpVillage" value="${c.village||''}" placeholder="e.g. Sarwan"></div>
+      <div class="field"><label>Tag</label><input id="cpTags" value="${c.tags||''}" placeholder="e.g. VIP, Frequent"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Referred By</label><input id="cpReferredBy" value="${c.referredBy||''}" placeholder="Who introduced them"></div>
+      <div class="field"><label>Family / Relation Link</label><input id="cpFamilyLink" value="${c.familyLink||''}" placeholder="e.g. Ramesh's son-in-law"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="cpNotes" value="${c.notes||''}" placeholder="Anything worth remembering about them"></div>
+    <div class="field" style="margin-top:14px;display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="cpCreditEnabled" ${c.creditEnabled?'checked':''} style="width:18px;height:18px;">
+      <label style="margin:0;" for="cpCreditEnabled">This customer has a credit / udhaar account</label>
+    </div>
+  `;
+  openModal('Edit Customer Profile', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Save Changes', cls:'btn-primary', onClick:()=>{
+      const name = document.getElementById('cpName').value.trim();
+      if(!name){ toast('Name is required'); return; }
+      c.name=name; c.phone=document.getElementById('cpPhone').value; c.village=document.getElementById('cpVillage').value;
+      c.tags=document.getElementById('cpTags').value; c.referredBy=document.getElementById('cpReferredBy').value;
+      c.familyLink=document.getElementById('cpFamilyLink').value; c.notes=document.getElementById('cpNotes').value;
+      c.photo = custPhotoData;
+      c.creditEnabled = document.getElementById('cpCreditEnabled').checked;
+      logHistory('Customer','Profile Updated', name+"'s profile updated");
+      saveDB(); closeModal(); toast('Profile updated'); viewCustomerLedger(id);
+    }}
+  ]);
+}
+function handleCustomerPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  compressImageFile(file, 320, 0.6, (dataUrl)=>{
+    custPhotoData = dataUrl;
+    document.getElementById('custPhotoPreview').outerHTML = `<img id="custPhotoPreview" src="${custPhotoData}" class="photoThumb">`;
+  });
 }
 function openCreditEditForm(entryId, custId){
   const e = DB.creditEntries.find(x=>x.id===entryId); if(!e) return;
@@ -1580,6 +2578,7 @@ function renderReports(){
   const monthAgo = new Date(Date.now()-30*86400000).toISOString().slice(0,10);
   const sumSales = (from) => DB.sales.filter(s=>!s.void && !s.deleted && s.date>=from).reduce((a,s)=>a+s.grandTotal,0);
   const sumBuy = (from) => DB.buying.filter(b=>b.date>=from && !b.deleted).reduce((a,b)=>a+b.amount,0);
+
   let html = `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">
     <div class="statCard"><div class="lbl">Sales — Today</div><div class="val">${fmtMoney(sumSales(today))}</div></div>
     <div class="statCard"><div class="lbl">Sales — 7 Days</div><div class="val">${fmtMoney(sumSales(weekAgo))}</div></div>
@@ -1588,14 +2587,85 @@ function renderReports(){
     <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Buying — 7 Days</div><div class="val">${fmtMoney(sumBuy(weekAgo))}</div></div>
     <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Buying — 30 Days</div><div class="val">${fmtMoney(sumBuy(monthAgo))}</div></div>
   </div>`;
+
+  // Sales by metal category (30 days)
+  const catTotals = {};
+  DB.sales.filter(s=>!s.void && !s.deleted && s.date>=monthAgo).forEach(s=>{
+    s.items.forEach(i=>{
+      const cat = i.category||'Other';
+      catTotals[cat] = (catTotals[cat]||0) + ((i.weight*(((i.purity===undefined||i.purity==='')?100:i.purity)/100))*(i.rate||0) + Number(i.making||0));
+    });
+  });
+
+  // Top customers by lifetime value
+  const custTotals = DB.customers.map(c=>{
+    const salesTotal = DB.sales.filter(s=>s.customerId===c.id && !s.deleted && !s.void).reduce((a,s)=>a+s.grandTotal,0);
+    return {name:c.name, total:salesTotal, id:c.id};
+  }).filter(c=>c.total>0).sort((a,b)=>b.total-a.total).slice(0,5);
+
+  // Inventory valuation at current rates
+  const stockItems = DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted);
+  let stockValue = 0, stockWtGold=0, stockWtSilver=0;
+  stockItems.forEach(i=>{
+    const purity = parseFloat(i.purity)||100;
+    const pureWt = (i.weight||0)*(purity/100);
+    const rate = i.category==='Gold' ? DB.currentRates.gold22/10 : DB.currentRates.silverKg/1000;
+    stockValue += pureWt*rate;
+    if(i.category==='Gold') stockWtGold += i.weight||0; else if(i.category==='Silver') stockWtSilver += i.weight||0;
+  });
+
+  // Girvi ageing buckets
+  const activeGirviList = DB.girvi.filter(g=>g.status==='active' && !g.deleted);
+  const buckets = {'0-30 din':0, '31-60 din':0, '61-90 din':0, '90+ din':0};
+  activeGirviList.forEach(g=>{
+    const d = daysBetween(g.date);
+    const principal = g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount;
+    if(d<=30) buckets['0-30 din']+=principal;
+    else if(d<=60) buckets['31-60 din']+=principal;
+    else if(d<=90) buckets['61-90 din']+=principal;
+    else buckets['90+ din']+=principal;
+  });
+
   html += `<div class="grid grid-2">`;
   html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Outstanding Summary</h3>
     <table><tr><td>Total Credit Due</td><td>${fmtMoney(DB.customers.reduce((a,c)=>a+Math.max(customerBalance(c.id),0),0))}</td></tr>
-    <tr><td>Active Girvi Loans</td><td>${fmtMoney(DB.girvi.filter(g=>g.status==='active' && !g.deleted).reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0))}</td></tr>
+    <tr><td>Active Girvi Loans</td><td>${fmtMoney(activeGirviList.reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0))}</td></tr>
     <tr><td>Pending Jobs</td><td>${DB.jobs.filter(j=>j.status!=='delivered' && !j.deleted).length}</td></tr>
-    <tr><td>Items In Stock</td><td>${DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted).length}</td></tr></table></div>`;
+    <tr><td>Items In Stock</td><td>${stockItems.length}</td></tr>
+    <tr><td>Silver Owed to Wholesalers</td><td>${fmtWt(DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>a+Math.max(wholesalerBalance(w.id).silverOwed,0),0))}</td></tr></table></div>`;
+
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Inventory Valuation (at today's rates)</h3>
+    <table><tr><td>Total Stock Value</td><td><b>${fmtMoney(stockValue)}</b></td></tr>
+    <tr><td>Gold Weight in Stock</td><td>${fmtWt(stockWtGold)}</td></tr>
+    <tr><td>Silver Weight in Stock</td><td>${fmtWt(stockWtSilver)}</td></tr>
+    <tr><td>Items in Stock</td><td>${stockItems.length}</td></tr></table>
+    <p class="helpText" style="margin-top:8px;">Estimated using current shop rates and each item's purity — a snapshot, not an audited valuation.</p></div>`;
+
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Sales by Category (30 Days)</h3>
+    <table>${Object.keys(catTotals).length ? Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>`<tr><td>${cat}</td><td>${fmtMoney(amt)}</td></tr>`).join('') : '<tr><td colspan="2" class="helpText">No sales in the last 30 days.</td></tr>'}</table></div>`;
+
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Top 5 Customers (Lifetime)</h3>
+    <table>${custTotals.length ? custTotals.map(c=>`<tr><td>${c.name}</td><td>${fmtMoney(c.total)}</td><td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View</button></td></tr>`).join('') : '<tr><td colspan="3" class="helpText">No sales recorded yet.</td></tr>'}</table></div>`;
+
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Girvi Ageing (Active Loans)</h3>
+    <table>${Object.entries(buckets).map(([label,amt])=>`<tr><td>${label}</td><td>${fmtMoney(amt)}</td></tr>`).join('')}</table>
+    <p class="helpText" style="margin-top:8px;">Loans older than 90 days may be worth following up or reviewing for forfeiture.</p></div>`;
+
   html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Expenses (30 Days)</h3>
     <table>${DB.expenses.filter(e=>e.date>=monthAgo && !e.deleted).map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.category}</td><td>${fmtMoney(e.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="helpText">No expenses logged.</td></tr>'}</table></div>`;
+
+  // Karigar-wise pending job workload
+  const karigarMap = {};
+  DB.jobs.filter(j=>!j.deleted && j.status!=='delivered').forEach(j=>{
+    const name = j.karigarName && j.karigarName.trim() ? j.karigarName.trim() : 'Unassigned';
+    if(!karigarMap[name]) karigarMap[name] = {count:0, weightOut:0};
+    karigarMap[name].count += 1;
+    karigarMap[name].weightOut += Number(j.weightOut)||0;
+  });
+  html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Karigar Workload (Pending Jobs)</h3>
+    <table><tr><th>Karigar</th><th>Pending Jobs</th><th>Expected Weight Out</th></tr>
+    ${Object.keys(karigarMap).length ? Object.entries(karigarMap).sort((a,b)=>b[1].count-a[1].count).map(([name,d])=>`<tr><td>${name}</td><td>${d.count}</td><td>${fmtWt(d.weightOut)}</td></tr>`).join('') : '<tr><td colspan="3" class="helpText">No pending manufacturing/repair jobs.</td></tr>'}</table></div>`;
+
   html += `</div>`;
   document.getElementById('content').innerHTML = html;
 }
@@ -1965,6 +3035,103 @@ function jcRecalc(){
 }
 
 /* =====================================================================
+   PAGE: MARKET RATES — online-only, reference-only. Never writes to
+   currentRates (which is what Sales/Buying actually bill against).
+   Lives ONLY on the Dashboard now — no separate page.
+===================================================================== */
+function extractPrice(data){
+  if(data==null) return null;
+  if(typeof data==='number') return data;
+  const candidates = [data.price, data.rate, data.value, data.price_usd, data.spot_price, data.ask, (data.rates&&data.rates.XAU), (data.rates&&data.rates.XAG)];
+  for(const c of candidates){ if(typeof c==='number' && !isNaN(c)) return c; }
+  return null;
+}
+async function fetchWithTimeout(url, ms){
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), ms);
+  try{ return await fetch(url, {signal: ctrl.signal}); }
+  finally{ clearTimeout(timer); }
+}
+async function fetchMarketRates(silent){
+  // Note: we do NOT pre-check navigator.onLine — on some tablets/WebKit
+  // versions it reports false incorrectly even with a working connection.
+  // We just attempt the fetch directly and report the real error if it fails.
+  if(!silent) toast('Fetching live rates...');
+  try{
+    const [goldRes, silverRes] = await Promise.all([
+      fetchWithTimeout('https://api.gold-api.com/price/XAU', 10000),
+      fetchWithTimeout('https://api.gold-api.com/price/XAG', 10000)
+    ]);
+    if(!goldRes.ok) throw new Error('Gold source returned HTTP '+goldRes.status);
+    if(!silverRes.ok) throw new Error('Silver source returned HTTP '+silverRes.status);
+    const goldJson = await goldRes.json();
+    const silverJson = await silverRes.json();
+    const goldPrice = extractPrice(goldJson);
+    const silverPrice = extractPrice(silverJson);
+    if(goldPrice==null && silverPrice==null) throw new Error('Response did not contain a recognisable price field');
+    DB.marketRates = {
+      goldUsdOz: goldPrice, silverUsdOz: silverPrice,
+      usdInr: DB.marketRates.usdInr || 88,
+      fetchedAt: nowISO(), source: 'gold-api.com (international spot reference)', lastError: null
+    };
+    logHistory('MarketRates','Fetched', `Gold $${goldPrice}/oz, Silver $${silverPrice}/oz`);
+    saveDB(); renderDashboardMarketMini(); if(!silent) toast('Live rates updated');
+  }catch(err){
+    const reason = err.name==='AbortError' ? 'Request timed out — slow or no internet' : (err.message || String(err) || 'Unknown error');
+    DB.marketRates.lastError = reason;
+    saveDB(); renderDashboardMarketMini();
+    if(!silent) toast('Could not fetch live rates: '+reason);
+  }
+}
+function saveUsdInr(val){
+  DB.marketRates.usdInr = parseFloat(val)||null;
+  saveDB(); renderDashboardMarketMini(); toast('Reference conversion rate saved');
+}
+function renderDashboardMarketMini(){
+  const el = document.getElementById('dashMarketMini'); if(!el) return;
+  const m = DB.marketRates;
+  if(!m.fetchedAt){
+    el.innerHTML = `<div class="helpText">Not fetched yet — tap ↻ when the tablet has internet.</div>${m.lastError?`<div class="helpText" style="color:var(--danger);margin-top:4px;">Last attempt failed: ${m.lastError}</div>`:''}`;
+    return;
+  }
+  const goldPerGram = m.goldUsdOz ? (m.goldUsdOz/31.1035) : null;
+  const silverPerGram = m.silverUsdOz ? (m.silverUsdOz/31.1035) : null;
+  const inrRate = m.usdInr;
+  const premium = (m.mcxPremiumPct===undefined||m.mcxPremiumPct===null) ? 12 : m.mcxPremiumPct;
+  const spotGoldInr10g = (inrRate&&goldPerGram) ? goldPerGram*inrRate*10 : null;
+  const spotSilverInrKg = (inrRate&&silverPerGram) ? silverPerGram*inrRate*1000 : null;
+  const mcxGoldEst = spotGoldInr10g ? spotGoldInr10g*(1+premium/100) : null;
+  const mcxSilverEst = spotSilverInrKg ? spotSilverInrKg*(1+premium/100) : null;
+  const isStale = daysBetween(m.fetchedAt.slice(0,10)) >= 1;
+  el.innerHTML = `
+    ${isStale?`<div class="helpText" style="color:#8A6416;">🕘 Last known rate (market closed / was offline) — not live right now.</div>`:''}
+    <table style="margin-top:4px;">
+      <tr><th>Metal</th><th>MCX (est.)</th><th>Spot</th></tr>
+      <tr><td>🥇 Gold</td><td>${mcxGoldEst?fmtMoney(mcxGoldEst)+'/10g':'-'}</td><td>$${m.goldUsdOz?m.goldUsdOz.toFixed(2):'-'}/oz${spotGoldInr10g?' ('+fmtMoney(spotGoldInr10g)+'/10g)':''}</td></tr>
+      <tr><td>🥈 Silver</td><td>${mcxSilverEst?fmtMoney(mcxSilverEst)+'/kg':'-'}</td><td>$${m.silverUsdOz?m.silverUsdOz.toFixed(2):'-'}/oz${spotSilverInrKg?' ('+fmtMoney(spotSilverInrKg)+'/kg)':''}</td></tr>
+    </table>
+    <div class="helpText" style="margin-top:4px;">As of ${new Date(m.fetchedAt).toLocaleString('en-IN')} • Source: ${m.source||'international spot'}</div>
+    <div class="helpText" style="margin-top:2px;">"MCX (est.)" = spot converted to ₹ + your duty/premium % below — a reference estimate, not an exchange-fed live MCX price. No free public MCX feed exists; a paid data vendor would be needed for true exchange-fed rates.</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:8px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label class="helpText" style="margin:0;">USD→INR:</label>
+        <input type="number" id="usdInrInput" value="${m.usdInr||''}" placeholder="e.g. 88" style="width:70px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveUsdInr(this.value)">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label class="helpText" style="margin:0;">Duty/Premium %:</label>
+        <input type="number" id="mcxPremiumInput" value="${premium}" style="width:60px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveMcxPremium(this.value)">
+      </div>
+    </div>
+    ${m.lastError?`<div class="helpText" style="color:var(--danger);margin-top:6px;">Last refresh attempt failed: ${m.lastError}</div>`:''}
+  `;
+}
+function saveMcxPremium(val){
+  DB.marketRates.mcxPremiumPct = parseFloat(val);
+  if(isNaN(DB.marketRates.mcxPremiumPct)) DB.marketRates.mcxPremiumPct = 12;
+  saveDB(); renderDashboardMarketMini(); toast('MCX estimate premium saved');
+}
+
+/* =====================================================================
    PAGE: SETTINGS
 ===================================================================== */
 function renderSettings(){
@@ -1973,6 +3140,12 @@ function renderSettings(){
       <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Shop Info</h3>
       <div class="field" style="margin-bottom:10px;"><label>Shop Name</label><input id="setShopName" value="${DB.meta.shopName}"></div>
       <div class="field" style="margin-bottom:10px;"><label>Location</label><input id="setLocation" value="${DB.meta.location}"></div>
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="field"><label>GSTIN (optional)</label><input id="setGstin" value="${DB.meta.gstin||''}"></div>
+        <div class="field"><label>BIS Hallmark Licence No. (optional)</label><input id="setBis" value="${DB.meta.bisLicenceNo||''}"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px;"><label>Signature Line on Bills</label><input id="setSigLine" value="${DB.meta.signatureLine||''}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>Bill Terms Note (small print)</label><textarea id="setBillTerms" rows="2">${DB.meta.billTermsNote||''}</textarea></div>
       <button class="btn btn-primary" style="margin-top:10px;" onclick="saveShopInfo()">Save</button>
     </div>
     <div class="card">
@@ -1983,12 +3156,14 @@ function renderSettings(){
         <div class="field"><label>Silver (per kg)</label><input type="number" id="setSilverKg" value="${DB.currentRates.silverKg}"></div>
       </div>
       <button class="btn btn-primary" onclick="saveRates()">Update Rates</button>
+      <p class="helpText" style="margin-top:10px;">These are the rates actually used in every Sale and Purchase. The live rate box on the Dashboard is reference-only and never changes these.</p>
     </div>
     <div class="card">
       <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Security</h3>
       <div class="field" style="margin-bottom:10px;"><label>Shop PIN</label><input id="setPin" maxlength="6" value="${DB.meta.pin}"></div>
-      <div class="field" style="margin-bottom:10px;"><label>Owner Approval PIN</label><input id="setOwnerPin" maxlength="6" value="${DB.meta.ownerPin}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>Manager PIN (for edit/delete & approvals)</label><input id="setOwnerPin" maxlength="6" value="${DB.meta.ownerPin}"></div>
       <div class="field" style="margin-bottom:10px;"><label>Discount Approval Threshold (%)</label><input type="number" id="setThreshold" value="${DB.meta.discountApprovalThresholdPct}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>Auto-Lock After Idle (minutes, 0 = off)</label><input type="number" id="setAutoLock" value="${DB.meta.autoLockMinutes||0}"></div>
       <button class="btn btn-primary" onclick="saveSecurity()">Save</button>
     </div>
     <div class="card">
@@ -2007,6 +3182,7 @@ function renderSettings(){
         <button class="btn btn-gold" onclick="doBackup()">⬇ Download Backup</button>
         <button class="btn btn-outline" onclick="document.getElementById('restoreFileInput').click()">⬆ Restore from File</button>
       </div>
+      <div class="field" style="margin-top:12px;max-width:220px;"><label>Remind me to back up every (days)</label><input type="number" id="setBackupDays" value="${DB.meta.backupReminderDays||3}" onchange="saveBackupReminderDays(this.value)"></div>
       <div class="helpText" style="margin-top:8px;">Last backup: ${DB.meta.lastBackupAt?fmtDate(DB.meta.lastBackupAt):'Never'}</div>
     </div>
     <div class="card">
@@ -2022,6 +3198,10 @@ function renderSettings(){
 function saveShopInfo(){
   DB.meta.shopName = document.getElementById('setShopName').value;
   DB.meta.location = document.getElementById('setLocation').value;
+  DB.meta.gstin = document.getElementById('setGstin').value;
+  DB.meta.bisLicenceNo = document.getElementById('setBis').value;
+  DB.meta.signatureLine = document.getElementById('setSigLine').value;
+  DB.meta.billTermsNote = document.getElementById('setBillTerms').value;
   document.getElementById('brandName').textContent = DB.meta.shopName;
   document.getElementById('brandLoc').textContent = DB.meta.location.toUpperCase();
   document.getElementById('lockTitle').textContent = DB.meta.shopName;
@@ -2042,7 +3222,12 @@ function saveSecurity(){
   DB.meta.pin = document.getElementById('setPin').value||DB.meta.pin;
   DB.meta.ownerPin = document.getElementById('setOwnerPin').value||DB.meta.ownerPin;
   DB.meta.discountApprovalThresholdPct = parseFloat(document.getElementById('setThreshold').value)||3;
-  saveDB(); toast('Security settings saved');
+  DB.meta.autoLockMinutes = parseFloat(document.getElementById('setAutoLock').value)||0;
+  saveDB(); startIdleTimer(); toast('Security settings saved');
+}
+function saveBackupReminderDays(val){
+  DB.meta.backupReminderDays = parseFloat(val)||3;
+  saveDB(); toast('Backup reminder updated');
 }
 function addStaff(){
   const name = document.getElementById('newStaffName').value.trim();
@@ -2112,11 +3297,13 @@ function unlockApp(){
   document.getElementById('shell').classList.add('active');
   pinBuffer='';
   init();
+  startIdleTimer();
 }
 function lockNow(){
   document.getElementById('lockScreen').style.display='flex';
   document.getElementById('shell').classList.remove('active');
   pinBuffer=''; updatePinDots();
+  stopIdleTimer();
 }
 document.getElementById('lockNowBtn').addEventListener('click', lockNow);
 document.getElementById('quickBackupBtn').addEventListener('click', doBackup);
@@ -2127,6 +3314,26 @@ function syncLangToggle(){
   document.getElementById('langHiBtn').className = DB.meta.language==='hi'?'active':'';
 }
 
+/* ---------------------- AUTO-LOCK (configurable idle timeout) ---------------------- */
+let idleTimerHandle = null;
+function resetIdleTimer(){
+  const mins = DB.meta.autoLockMinutes || 0;
+  if(mins<=0) return;
+  clearTimeout(idleTimerHandle);
+  idleTimerHandle = setTimeout(()=>{ lockNow(); }, mins*60000);
+}
+function startIdleTimer(){
+  stopIdleTimer();
+  const mins = DB.meta.autoLockMinutes || 0;
+  if(mins<=0) return;
+  ['click','touchstart','keydown','mousemove'].forEach(evt=> document.addEventListener(evt, resetIdleTimer));
+  resetIdleTimer();
+}
+function stopIdleTimer(){
+  clearTimeout(idleTimerHandle);
+  ['click','touchstart','keydown','mousemove'].forEach(evt=> document.removeEventListener(evt, resetIdleTimer));
+}
+
 /* =====================================================================
    INIT
 ===================================================================== */
@@ -2134,7 +3341,7 @@ const PAGES = {
   dashboard: renderDashboard, sales: renderSales, buying: renderBuying, girvi: renderGirvi,
   credit: renderCredit, inventory: renderInventory, jobs: renderJobs, exchange: renderExchange,
   ledger: renderLedger, history: renderHistory, reports: renderReports, settings: renderSettings,
-  cashday: renderCashday, expenses: renderExpenses, wholesaler: renderWholesaler, calculator: renderCalculator
+  cashday: renderCashday, expenses: renderExpenses, wholesaler: renderWholesaler, calculator: renderCalculator,
 };
 function updateClock(){
   const el = document.getElementById('topDateTime'); if(!el) return;
