@@ -341,7 +341,7 @@ function defaultDB(){
     },
     rateHistory:[],
     currentRates:{ gold24:9800, gold22:8990, silverKg:88000, updatedAt: nowISO() },
-    marketRates:{ goldUsdOz:null, silverUsdOz:null, usdInr:88, fetchedAt:null, source:null, lastError:null, mcxPremiumPct:12 },
+    marketRates:{ goldUsdOz:null, silverUsdOz:null, usdInr:null, fxSource:null, fetchedAt:null, source:null, lastError:null, mcxPremiumPctGold:15, mcxPremiumPctSilver:25 },
     customers:[],
     sales:[], buying:[], girvi:[], creditEntries:[], inventory:[], jobs:[], exchange:[],
     expenses:[], cashDays:[], staff:[{id:uid('STF'),name:'Owner',role:'owner',pin:'1234'}],
@@ -354,10 +354,19 @@ function defaultDB(){
 function migrateDB(d){
   if(!d.wholesalers) d.wholesalers=[];
   if(!d.wholesalerEntries) d.wholesalerEntries=[];
-  if(!d.marketRates) d.marketRates={ goldUsdOz:null, silverUsdOz:null, usdInr:88, fetchedAt:null, source:null, lastError:null, mcxPremiumPct:12 };
-  else if(d.marketRates.mcxPremiumPct===undefined) d.marketRates.mcxPremiumPct=12;
-  else if(d.marketRates.usdInr===null || d.marketRates.usdInr===undefined) d.marketRates.usdInr=88;
-  else if(d.marketRates.lastError===undefined) d.marketRates.lastError=null;
+  if(!d.marketRates) d.marketRates={ goldUsdOz:null, silverUsdOz:null, usdInr:null, fxSource:null, fetchedAt:null, source:null, lastError:null, mcxPremiumPctGold:15, mcxPremiumPctSilver:25 };
+  else {
+    const old = d.marketRates.mcxPremiumPct;
+    if(d.marketRates.mcxPremiumPctGold===undefined) d.marketRates.mcxPremiumPctGold = (old!==undefined?old:15);
+    if(d.marketRates.mcxPremiumPctSilver===undefined) d.marketRates.mcxPremiumPctSilver = (old!==undefined?Math.max(old,25):25);
+    delete d.marketRates.mcxPremiumPct;
+    // The USD-INR default used to be a stale hardcoded 88 — if it looks like
+    // nobody ever adjusted it and no live fetch has happened, clear it so the
+    // widget prompts a fresh fetch instead of silently using an old number.
+    if(d.marketRates.usdInr===88 && !d.marketRates.fetchedAt) d.marketRates.usdInr = null;
+    if(d.marketRates.fxSource===undefined) d.marketRates.fxSource = null;
+    if(d.marketRates.lastError===undefined) d.marketRates.lastError = null;
+  }
   if(d.meta && d.meta.discountApprovalThresholdPct===undefined) d.meta.discountApprovalThresholdPct=3;
   if(d.meta){
     if(d.meta.gstin===undefined) d.meta.gstin='';
@@ -3058,9 +3067,10 @@ async function fetchMarketRates(silent){
   // We just attempt the fetch directly and report the real error if it fails.
   if(!silent) toast('Fetching live rates...');
   try{
-    const [goldRes, silverRes] = await Promise.all([
+    const [goldRes, silverRes, fxRes] = await Promise.all([
       fetchWithTimeout('https://api.gold-api.com/price/XAU', 10000),
-      fetchWithTimeout('https://api.gold-api.com/price/XAG', 10000)
+      fetchWithTimeout('https://api.gold-api.com/price/XAG', 10000),
+      fetchWithTimeout('https://api.frankfurter.dev/v2/rate/USD/INR', 10000).catch(()=>null)
     ]);
     if(!goldRes.ok) throw new Error('Gold source returned HTTP '+goldRes.status);
     if(!silverRes.ok) throw new Error('Silver source returned HTTP '+silverRes.status);
@@ -3069,12 +3079,24 @@ async function fetchMarketRates(silent){
     const goldPrice = extractPrice(goldJson);
     const silverPrice = extractPrice(silverJson);
     if(goldPrice==null && silverPrice==null) throw new Error('Response did not contain a recognisable price field');
+    let usdInr = DB.marketRates.usdInr || null;
+    let fxSource = 'manual';
+    if(fxRes && fxRes.ok){
+      try{
+        const fxJson = await fxRes.json();
+        const rate = fxJson.rate!=null ? fxJson.rate : (fxJson.rates && fxJson.rates.INR);
+        if(typeof rate==='number' && !isNaN(rate)){ usdInr = rate; fxSource = 'frankfurter.dev (live)'; }
+      }catch(e){ /* keep existing usdInr if currency parse fails */ }
+    }
+    // Preserve premium settings — a refresh must never silently reset them.
     DB.marketRates = {
       goldUsdOz: goldPrice, silverUsdOz: silverPrice,
-      usdInr: DB.marketRates.usdInr || 88,
-      fetchedAt: nowISO(), source: 'gold-api.com (international spot reference)', lastError: null
+      usdInr, fxSource,
+      fetchedAt: nowISO(), source: 'gold-api.com (international spot reference)', lastError: null,
+      mcxPremiumPctGold: DB.marketRates.mcxPremiumPctGold!==undefined ? DB.marketRates.mcxPremiumPctGold : 15,
+      mcxPremiumPctSilver: DB.marketRates.mcxPremiumPctSilver!==undefined ? DB.marketRates.mcxPremiumPctSilver : 25
     };
-    logHistory('MarketRates','Fetched', `Gold $${goldPrice}/oz, Silver $${silverPrice}/oz`);
+    logHistory('MarketRates','Fetched', `Gold $${goldPrice}/oz, Silver $${silverPrice}/oz, USD/INR ${usdInr||'manual'}`);
     saveDB(); renderDashboardMarketMini(); if(!silent) toast('Live rates updated');
   }catch(err){
     const reason = err.name==='AbortError' ? 'Request timed out — slow or no internet' : (err.message || String(err) || 'Unknown error');
@@ -3085,6 +3107,7 @@ async function fetchMarketRates(silent){
 }
 function saveUsdInr(val){
   DB.marketRates.usdInr = parseFloat(val)||null;
+  DB.marketRates.fxSource = 'manual';
   saveDB(); renderDashboardMarketMini(); toast('Reference conversion rate saved');
 }
 function renderDashboardMarketMini(){
@@ -3097,11 +3120,12 @@ function renderDashboardMarketMini(){
   const goldPerGram = m.goldUsdOz ? (m.goldUsdOz/31.1035) : null;
   const silverPerGram = m.silverUsdOz ? (m.silverUsdOz/31.1035) : null;
   const inrRate = m.usdInr;
-  const premium = (m.mcxPremiumPct===undefined||m.mcxPremiumPct===null) ? 12 : m.mcxPremiumPct;
+  const premGold = (m.mcxPremiumPctGold===undefined||m.mcxPremiumPctGold===null) ? 15 : m.mcxPremiumPctGold;
+  const premSilver = (m.mcxPremiumPctSilver===undefined||m.mcxPremiumPctSilver===null) ? 25 : m.mcxPremiumPctSilver;
   const spotGoldInr10g = (inrRate&&goldPerGram) ? goldPerGram*inrRate*10 : null;
   const spotSilverInrKg = (inrRate&&silverPerGram) ? silverPerGram*inrRate*1000 : null;
-  const mcxGoldEst = spotGoldInr10g ? spotGoldInr10g*(1+premium/100) : null;
-  const mcxSilverEst = spotSilverInrKg ? spotSilverInrKg*(1+premium/100) : null;
+  const mcxGoldEst = spotGoldInr10g ? spotGoldInr10g*(1+premGold/100) : null;
+  const mcxSilverEst = spotSilverInrKg ? spotSilverInrKg*(1+premSilver/100) : null;
   const isStale = daysBetween(m.fetchedAt.slice(0,10)) >= 1;
   el.innerHTML = `
     ${isStale?`<div class="helpText" style="color:#8A6416;">🕘 Last known rate (market closed / was offline) — not live right now.</div>`:''}
@@ -3111,24 +3135,30 @@ function renderDashboardMarketMini(){
       <tr><td>🥈 Silver</td><td>${mcxSilverEst?fmtMoney(mcxSilverEst)+'/kg':'-'}</td><td>$${m.silverUsdOz?m.silverUsdOz.toFixed(2):'-'}/oz${spotSilverInrKg?' ('+fmtMoney(spotSilverInrKg)+'/kg)':''}</td></tr>
     </table>
     <div class="helpText" style="margin-top:4px;">As of ${new Date(m.fetchedAt).toLocaleString('en-IN')} • Source: ${m.source||'international spot'}</div>
-    <div class="helpText" style="margin-top:2px;">"MCX (est.)" = spot converted to ₹ + your duty/premium % below — a reference estimate, not an exchange-fed live MCX price. No free public MCX feed exists; a paid data vendor would be needed for true exchange-fed rates.</div>
+    <div class="helpText" style="margin-top:2px;">"MCX (est.)" = spot converted to ₹ + duty/premium % below — a reference estimate, not an exchange-fed live MCX price. No free public MCX feed exists; a paid exchange data vendor would be needed for exact futures prices. Gold and silver premiums differ (silver's is currently running higher due to reported supply tightness), so they're set separately below.</div>
     <div style="display:flex;align-items:center;gap:14px;margin-top:8px;flex-wrap:wrap;">
       <div style="display:flex;align-items:center;gap:6px;">
         <label class="helpText" style="margin:0;">USD→INR:</label>
-        <input type="number" id="usdInrInput" value="${m.usdInr||''}" placeholder="e.g. 88" style="width:70px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveUsdInr(this.value)">
+        <input type="number" id="usdInrInput" value="${m.usdInr||''}" placeholder="e.g. 95.4" style="width:70px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveUsdInr(this.value)">
+        <span class="helpText" style="margin:0;">(${m.fxSource==='manual'||!m.fxSource?'manual':'live-fetched'})</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <label class="helpText" style="margin:0;">Duty/Premium %:</label>
-        <input type="number" id="mcxPremiumInput" value="${premium}" style="width:60px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveMcxPremium(this.value)">
+        <label class="helpText" style="margin:0;">Gold premium %:</label>
+        <input type="number" id="mcxPremiumGoldInput" value="${premGold}" style="width:55px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveMcxPremium('gold', this.value)">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label class="helpText" style="margin:0;">Silver premium %:</label>
+        <input type="number" id="mcxPremiumSilverInput" value="${premSilver}" style="width:55px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;" onchange="saveMcxPremium('silver', this.value)">
       </div>
     </div>
     ${m.lastError?`<div class="helpText" style="color:var(--danger);margin-top:6px;">Last refresh attempt failed: ${m.lastError}</div>`:''}
   `;
 }
-function saveMcxPremium(val){
-  DB.marketRates.mcxPremiumPct = parseFloat(val);
-  if(isNaN(DB.marketRates.mcxPremiumPct)) DB.marketRates.mcxPremiumPct = 12;
-  saveDB(); renderDashboardMarketMini(); toast('MCX estimate premium saved');
+function saveMcxPremium(metal, val){
+  const parsed = parseFloat(val);
+  if(metal==='gold') DB.marketRates.mcxPremiumPctGold = isNaN(parsed) ? 15 : parsed;
+  else DB.marketRates.mcxPremiumPctSilver = isNaN(parsed) ? 25 : parsed;
+  saveDB(); renderDashboardMarketMini(); toast('Premium updated');
 }
 
 /* =====================================================================
