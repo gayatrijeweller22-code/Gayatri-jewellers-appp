@@ -346,6 +346,8 @@ function defaultDB(){
     sales:[], buying:[], girvi:[], creditEntries:[], inventory:[], jobs:[], exchange:[],
     expenses:[], cashDays:[], staff:[{id:uid('STF'),name:'Owner',role:'owner',pin:'1234'}],
     wholesalers:[], wholesalerEntries:[],
+    stockLots:[], components:[], inventoryMovements:[],
+    todos:[],
     history:[]
   };
 }
@@ -390,11 +392,12 @@ function migrateDB(d){
       g.outstandingPrincipal = Math.max(principal,0);
     }
     if(g.referenceName===undefined) g.referenceName='';
+    if(g.linkedBuyingId===undefined) g.linkedBuyingId=null;
     if(g.forwards===undefined) g.forwards=[];
     if(g.notes===undefined) g.notes='';
   });
   (d.sales||[]).forEach(s=>{ (s.items||[]).forEach(i=>{ if(i.purity===undefined || i.purity==='') i.purity=100; if(i.stoneWeight===undefined) i.stoneWeight=0; }); });
-  (d.buying||[]).forEach(b=>{ if(b.purity===undefined || b.purity==='') b.purity=100; });
+  (d.buying||[]).forEach(b=>{ if(b.purity===undefined || b.purity==='') b.purity=100; if(b.linkedGirviId===undefined) b.linkedGirviId=null; if(b.notes===undefined) b.notes=''; });
   (d.customers||[]).forEach(c=>{
     if(c.photo===undefined) c.photo=null;
     if(c.village===undefined) c.village='';
@@ -408,6 +411,7 @@ function migrateDB(d){
       c.creditEnabled = (d.creditEntries||[]).some(e=>e.customerId===c.id && !e.deleted);
     }
   });
+  (d.creditEntries||[]).forEach(e=>{ if(e.dueDate===undefined) e.dueDate=''; });
   (d.inventory||[]).forEach(i=>{
     ['subcategory','designGroup','size','pairSingle','style','stoneOrNot','customAttr','batchNo','karigarSource','remarks','weightType','sourceType','wholesalerId'].forEach(f=>{
       if(i[f]===undefined) i[f]='';
@@ -418,8 +422,25 @@ function migrateDB(d){
     if(i.wholesalerMakingPerGram===undefined) i.wholesalerMakingPerGram='';
     if(i.wholesalerRateUsed===undefined) i.wholesalerRateUsed='';
     if(i.linkedSaleId===undefined) i.linkedSaleId=null;
+    // Masterclass inventory fields — additive only, never touches old values.
+    ['grossWeight','netWeight','stoneType','stoneCount','stoneCarat','stoneColor','stoneClarity',
+     'huid','hallmarkNumber','hallmarkCertDetails','location','mfgDate','tags',
+     'linkedGirviId','linkedExchangeId','linkedJobId','lotId'].forEach(f=>{
+      if(i[f]===undefined) i[f]='';
+    });
+    if(i.costPrice===undefined) i.costPrice='';
+    if(i.sellingPrice===undefined) i.sellingPrice='';
+    if(i.hallmarkStatus===undefined) i.hallmarkStatus = i.huid ? 'Hallmarked' : 'Not Hallmarked';
+    if(i.location===undefined || i.location==='') i.location='Showcase';
+    if(!Array.isArray(i.photos)) i.photos = i.photo ? [i.photo] : [];
   });
-  (d.jobs||[]).forEach(j=>{ if(j.karigarName===undefined) j.karigarName=''; });
+  if(!d.stockLots) d.stockLots=[];
+  if(!d.todos) d.todos=[];
+  if(!d.components) d.components=[];
+  if(!d.inventoryMovements) d.inventoryMovements=[];
+  (d.jobs||[]).forEach(j=>{ if(j.karigarName===undefined) j.karigarName=''; if(j.linkedInventoryId===undefined) j.linkedInventoryId=null; if(j.wastage===undefined) j.wastage=null; });
+  (d.girvi||[]).forEach(g=>{ if(g.linkedInventoryId===undefined) g.linkedInventoryId=null; });
+  (d.exchange||[]).forEach(e=>{ if(e.linkedInventoryId===undefined) e.linkedInventoryId=null; });
   return d;
 }
 let DB = loadDB();
@@ -491,6 +512,7 @@ const NAV = [
   {id:'cashday', num:'', label:'Cash / Day Close', hi:'कैश डे क्लोज़', icon:'💰', group:'extra'},
   {id:'expenses', num:'', label:'Expenses', hi:'खर्च', icon:'🧮', group:'extra'},
   {id:'wholesaler', num:'', label:'Wholesaler Khata', hi:'थोक व्यापारी खाता', icon:'📇', group:'extra'},
+  {id:'todo', num:'', label:'To-Do / Purchase List', hi:'टू-डू सूची', icon:'📝', group:'extra'},
   {id:'calculator', num:'', label:'Calculator', hi:'कैलकुलेटर', icon:'🖩', group:'extra'},
 ];
 
@@ -572,6 +594,10 @@ function guardDelete(entityLabel, cb){
     confirmAction(`Delete this ${entityLabel}? This can only be undone by an owner restoring from a backup.`, cb);
   });
 }
+/* One-click full-size photo preview, used across Girvi and Customer photos. */
+function openFullPhoto(src, caption){
+  openModal(caption||'Photo', `<div style="text-align:center;"><img src="${src}" style="max-width:100%;max-height:70vh;border-radius:8px;"></div>`, [{label:'Close', cls:'btn-ghost', onClick:closeModal}]);
+}
 
 /* ---------------------- GLOBAL SEARCH ---------------------- */
 function openGlobalSearch(){
@@ -638,15 +664,26 @@ function customerOptionsHTML(){
 /* =====================================================================
    PAGE: DASHBOARD
 ===================================================================== */
+function getAllForwardedEntries(){
+  const list = [];
+  DB.girvi.filter(g=>!g.deleted).forEach(g=>{
+    (g.forwards||[]).filter(f=>!f.deleted).forEach(f=> list.push({...f, girviId:g.id, customerName:g.customerName, itemDesc:g.itemDesc}));
+  });
+  return list;
+}
 function renderDashboard(){
   const today = todayStr();
   const todaySales = DB.sales.filter(s=>s.date===today && !s.void && !s.deleted);
   const todaySalesTotal = todaySales.reduce((a,s)=>a+s.grandTotal,0);
   const activeGirvi = DB.girvi.filter(g=>g.status==='active' && !g.deleted);
-  const totalGirviOut = activeGirvi.reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0);
+  const totalGirviPrincipal = activeGirvi.reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0);
+  const forwardedEntries = getAllForwardedEntries();
+  const activeForwarded = forwardedEntries.filter(f=>f.status==='forwarded');
+  const totalForwardedOut = activeForwarded.reduce((a,f)=>a+f.amount,0);
+  const totalGirviOut = Math.max(totalGirviPrincipal - totalForwardedOut, 0);
   const creditDue = DB.customers.reduce((a,c)=> a + Math.max(customerBalance(c.id),0), 0);
   const pendingJobs = DB.jobs.filter(j=>j.status!=='delivered' && !j.void && !j.deleted);
-  const lowStock = DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted);
+  const lowStock = DB.inventory.filter(i=>invIsAvailable(i) && !i.deleted);
   const overdueGirvi = activeGirvi.filter(g=>g.dueDate && g.dueDate < today);
   const wholesalerTotals = DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,cash:0});
 
@@ -662,9 +699,10 @@ function renderDashboard(){
 
   html += `<div class="statGrid">
     <div class="statCard"><div class="lbl">Today's Sales</div><div class="val">${fmtMoney(todaySalesTotal)}</div><div class="sub">${todaySales.length} bill(s)</div></div>
-    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Active Girvi Loans</div><div class="val">${fmtMoney(totalGirviOut)}</div><div class="sub">${activeGirvi.length} item(s) held</div></div>
+    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Active Girvi (excl. forwarded)</div><div class="val">${fmtMoney(totalGirviOut)}</div><div class="sub">${activeGirvi.length} item(s) held</div></div>
+    <div class="statCard" style="border-color:var(--maroon)"><div class="lbl">🏦 Forwarded Rakam</div><div class="val">${fmtMoney(totalForwardedOut)}</div><div class="sub">${activeForwarded.length} entr${activeForwarded.length===1?'y':'ies'} • <span style="cursor:pointer;text-decoration:underline;" onclick="openForwardedRakamList()">View</span></div></div>
     <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Total Credit Due</div><div class="val">${fmtMoney(creditDue)}</div><div class="sub">across ${DB.customers.length} customers</div></div>
-    <div class="statCard" style="border-color:var(--success)"><div class="lbl">Pending Jobs</div><div class="val">${pendingJobs.length}</div><div class="sub">${DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted).length} items in stock</div></div>
+    <div class="statCard" style="border-color:var(--success)"><div class="lbl">Pending Jobs</div><div class="val">${pendingJobs.length}</div><div class="sub">${DB.inventory.filter(i=>invIsAvailable(i) && !i.deleted).length} items in stock</div></div>
     <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Silver Owed to Wholesalers</div><div class="val">${fmtWt(wholesalerTotals.silver)}</div><div class="sub">Cash/labour owed: ${fmtMoney(wholesalerTotals.cash)}</div></div>
   </div>`;
 
@@ -672,8 +710,10 @@ function renderDashboard(){
   html += `<div class="card"><div class="cardHead"><h3>⚠️ Alerts & Reminders</h3></div>`;
   const alerts=[];
   overdueGirvi.forEach(g=> alerts.push(`Girvi loan for <b>${g.customerName}</b> (${fmtWt(g.weight)}) is overdue since ${fmtDate(g.dueDate)}.`));
-  DB.customers.forEach(c=>{ const b=customerBalance(c.id); if(b>0) alerts.push(`<b>${c.name}</b> has outstanding credit of ${fmtMoney(b)}.`); });
+  DB.customers.forEach(c=>{ if(!c.creditEnabled) return; const info=creditOldestOverdueInfo(c.id); const b=customerBalance(c.id); if(b>0 && info && info.isOverdue) alerts.push(`<b>${c.name}</b>'s udhaar of ${fmtMoney(b)} looks overdue (${info.daysOld} days old).`); else if(b>0) alerts.push(`<b>${c.name}</b> has outstanding credit of ${fmtMoney(b)}.`); });
   pendingJobs.filter(j=>j.expectedDate && j.expectedDate<today).forEach(j=> alerts.push(`Job for <b>${j.customerName}</b> (${j.itemDesc}) is overdue for delivery.`));
+  const todosPending = DB.todos.filter(t=>!t.deleted && t.status==='pending');
+  if(todosPending.length>0) alerts.push(`${todosPending.length} item(s) pending on your <span style="cursor:pointer;text-decoration:underline;" onclick="goTo('todo')">to-do / purchase list</span>.`);
   if(alerts.length===0) html+=`<div class="empty"><div class="big">✅</div>No pending alerts. All caught up.</div>`;
   else html += `<div>` + alerts.slice(0,8).map(a=>`<div style="padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;">🔸 ${a}</div>`).join('') + `</div>`;
   html += `</div>`;
@@ -701,6 +741,7 @@ function renderDashboard(){
       <button class="btn btn-outline" onclick="goTo('girvi')">🔐 New Girvi</button>
       <button class="btn btn-outline" onclick="goTo('jobs')">🛠️ New Job</button>
       <button class="btn btn-outline" onclick="goTo('wholesaler')">📇 Wholesaler Khata</button>
+      <button class="btn btn-outline" onclick="goTo('todo')">📝 To-Do List</button>
       <button class="btn btn-outline" onclick="goTo('calculator')">🖩 Calculator</button>
     </div></div>`;
 
@@ -711,6 +752,14 @@ function renderDashboard(){
     window._marketRatesTriedThisSession = true;
     fetchMarketRates(true);
   }
+}
+function openForwardedRakamList(){
+  const entries = getAllForwardedEntries().sort((a,b)=> (a.status==='forwarded'?0:1)-(b.status==='forwarded'?0:1) || b.dateForwarded.localeCompare(a.dateForwarded));
+  let body = `<p class="helpText" style="margin-top:0;">🏦 This is money from customer girvi loans that you've placed with another shop/lender — tracked separately from your normal girvi khata.</p>`;
+  body += `<table><tr><th>Shop/Person</th><th>From Girvi Of</th><th>Amount</th><th>%</th><th>Forwarded</th><th>Status</th></tr>`;
+  body += entries.length ? entries.map(f=>`<tr><td>${f.shopName}</td><td>${f.customerName}</td><td>${fmtMoney(f.amount)}</td><td>${f.percent}%</td><td>${fmtDate(f.dateForwarded)}</td><td>${f.status==='forwarded'?'<span class="tag tag-gold">Forwarded</span>':'<span class="tag tag-green">Returned</span>'}</td></tr>`).join('') : `<tr><td colspan="6" class="helpText">No forwarded rakam entries yet.</td></tr>`;
+  body += `</table>`;
+  openModal('Forwarded Rakam — All Entries', body, [{label:'Close', cls:'btn-ghost', onClick:closeModal}]);
 }
 
 /* =====================================================================
@@ -723,20 +772,55 @@ function renderSales(){
     <div></div>
     <button class="btn btn-primary" onclick="openSaleForm()">+ ${T('newSale')}</button>
   </div>`;
-  html += `<div class="card"><div class="searchBar"><input id="saleSearch" placeholder="Search by customer or item..." oninput="filterSalesTable()"></div><div id="salesTableWrap"></div></div>`;
+  html += `<div class="card">
+    <div class="grid grid-3" style="margin-bottom:10px;">
+      <input id="saleSearch" placeholder="Search bill no, customer, item..." oninput="filterSalesTable()">
+      <select id="saleSort" onchange="filterSalesTable()">
+        <option value="date_desc">Date (Newest)</option>
+        <option value="date_asc">Date (Oldest)</option>
+        <option value="amount_desc">Amount (High to Low)</option>
+        <option value="amount_asc">Amount (Low to High)</option>
+        <option value="customer">Customer Name (A-Z)</option>
+        <option value="balance_desc">Balance Due (High to Low)</option>
+      </select>
+      <select id="saleStatusFilter" onchange="filterSalesTable()">
+        <option value="">All Statuses</option>
+        <option value="paid">Paid</option>
+        <option value="due">Due / Credit</option>
+        <option value="void">Void</option>
+      </select>
+    </div>
+    <div id="salesTableWrap"></div>
+  </div>`;
   document.getElementById('content').innerHTML = html;
   filterSalesTable();
 }
 function filterSalesTable(){
   const q = (document.getElementById('saleSearch')?.value||'').toLowerCase();
-  let rows = [...DB.sales].filter(s=>!s.deleted).sort((a,b)=> b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  if(q) rows = rows.filter(s => s.customerName.toLowerCase().includes(q) || s.items.some(i=>i.itemName.toLowerCase().includes(q)));
-  let html = `<table><tr><th>Date</th><th>Bill No</th><th>Customer</th><th>Weight</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr>`;
-  if(rows.length===0) html += `<tr><td colspan="9"><div class="empty"><div class="big">🧾</div>No sales yet. Create your first bill.</div></td></tr>`;
+  const sortBy = document.getElementById('saleSort')?.value||'date_desc';
+  const statusF = document.getElementById('saleStatusFilter')?.value||'';
+  let rows = [...DB.sales].filter(s=>!s.deleted);
+  if(q) rows = rows.filter(s => s.billNo.toLowerCase().includes(q) || s.customerName.toLowerCase().includes(q) || s.items.some(i=>i.itemName.toLowerCase().includes(q)) || String(s.grandTotal).includes(q));
+  if(statusF==='paid') rows = rows.filter(s=>!s.void && s.grandTotal-s.amountPaid<=0);
+  else if(statusF==='due') rows = rows.filter(s=>!s.void && s.grandTotal-s.amountPaid>0);
+  else if(statusF==='void') rows = rows.filter(s=>s.void);
+  const sorters = {
+    date_desc: (a,b)=> b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+    date_asc: (a,b)=> a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt),
+    amount_desc: (a,b)=> b.grandTotal-a.grandTotal,
+    amount_asc: (a,b)=> a.grandTotal-b.grandTotal,
+    customer: (a,b)=> a.customerName.localeCompare(b.customerName),
+    balance_desc: (a,b)=> (b.grandTotal-b.amountPaid)-(a.grandTotal-a.amountPaid)
+  };
+  rows.sort(sorters[sortBy]||sorters.date_desc);
+  let html = `<table><tr><th>Date</th><th>Bill No</th><th>Customer</th><th>Item(s)</th><th>Weight</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="10"><div class="empty"><div class="big">🧾</div>No sales match.</div></td></tr>`;
   rows.forEach(s=>{
     const wt = s.items.reduce((a,i)=>a+Number(i.weight||0),0);
+    const itemNames = s.items.map(i=>i.itemName).filter(Boolean).join(', ');
     html += `<tr>
-      <td>${fmtDate(s.date)}</td><td>${s.billNo}</td><td>${s.customerName}</td><td>${fmtWt(wt)}</td>
+      <td>${fmtDate(s.date)}</td><td>${s.billNo}</td><td>${s.customerName}</td>
+      <td style="max-width:180px;">${itemNames||'-'}</td><td>${fmtWt(wt)}</td>
       <td>${fmtMoney(s.grandTotal)}</td><td>${fmtMoney(s.amountPaid)}</td><td>${fmtMoney(s.grandTotal-s.amountPaid)}</td>
       <td>${s.void?'<span class="tag tag-red">VOID</span>':(s.grandTotal-s.amountPaid<=0?'<span class="tag tag-green">Paid</span>':'<span class="tag tag-gold">Due</span>')}</td>
       <td><button class="btn btn-sm btn-ghost" onclick="viewSale('${s.id}')">View</button></td>
@@ -827,7 +911,7 @@ function renderSaleItemRows(){
   saleDraftItems.forEach((it,i)=> autoFillRate(i));
 }
 function pickInventoryForSaleItem(rowIndex){
-  const stock = DB.inventory.filter(x=>!x.deleted && x.status==='in-stock');
+  const stock = DB.inventory.filter(x=>!x.deleted && invIsAvailable(x));
   const body = `
     <input id="invPickerSearch" placeholder="Search item / code..." style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:8px;margin-bottom:10px;" oninput="renderInvPickerList(${rowIndex}, this.value)">
     <div id="invPickerList" style="max-height:45vh;overflow-y:auto;"></div>
@@ -837,7 +921,7 @@ function pickInventoryForSaleItem(rowIndex){
 }
 function renderInvPickerList(rowIndex, q){
   q=(q||'').toLowerCase();
-  const stock = DB.inventory.filter(x=>!x.deleted && x.status==='in-stock' && (!q || x.itemName.toLowerCase().includes(q) || x.code.toLowerCase().includes(q)));
+  const stock = DB.inventory.filter(x=>!x.deleted && invIsAvailable(x) && (!q || x.itemName.toLowerCase().includes(q) || x.code.toLowerCase().includes(q)));
   const box = document.getElementById('invPickerList'); if(!box) return;
   if(stock.length===0){ box.innerHTML = `<div class="empty"><div class="big">💍</div>No matching in-stock items.</div>`; return; }
   box.innerHTML = stock.map(x=>`<div class="searchResultRow" onclick="linkInventoryToSaleItem(${rowIndex}, '${x.id}')"><span>${x.code} — ${x.itemName} (${fmtWt(x.weight)}, ${x.purity}${typeof x.purity==='number'?'%':''}, qty ${x.qty})</span><span>Select</span></div>`).join('');
@@ -902,7 +986,10 @@ function saveSale(){
     if(editingSaleId){
       const s = DB.sales.find(x=>x.id===editingSaleId);
       // Release any inventory items that were linked to this sale before, so relinking is clean
-      DB.inventory.filter(inv=>inv.linkedSaleId===s.id).forEach(inv=>{ inv.status='in-stock'; inv.linkedSaleId=null; inv.soldDate=null; });
+      DB.inventory.filter(inv=>inv.linkedSaleId===s.id).forEach(inv=>{
+        inv.status='available'; inv.linkedSaleId=null; inv.soldDate=null;
+        logInventoryMovement(inv.id, 'Sold → Available', {toLocation:inv.location||'Showcase', reference:s.billNo, notes:'Unlinked before re-saving edited bill'});
+      });
       s.customerId=cust.id; s.customerName=cust.name; s.date=saleDate; s.items=cleanItems;
       s.subTotal=sub; s.discount=discount; s.discountPct=pct; s.grandTotal=grand; s.paymentMode=payMode; s.amountPaid=amountPaid;
       applyInventoryDeduction(s);
@@ -935,15 +1022,18 @@ function applyInventoryDeduction(sale){
     if(!it.linkedInventoryId) return;
     const inv = DB.inventory.find(x=>x.id===it.linkedInventoryId && !x.deleted);
     if(!inv) return;
-    inv.status = 'sold'; inv.soldDate = sale.date; inv.linkedSaleId = sale.id;
-    logHistory('Inventory','Sold', `${inv.itemName} (${inv.code}) sold via bill ${sale.billNo}`);
+    const oldLoc = inv.location;
+    inv.status = 'sold'; inv.soldDate = sale.date; inv.linkedSaleId = sale.id; inv.qty = Math.max((Number(inv.qty)||1)-1, 0);
+    logInventoryMovement(inv.id, 'Available → Sold', {fromLocation:oldLoc, toLocation:'Customer', weightChange:-(Number(inv.weight)||0), reference:sale.billNo, notes:'Sold via bill '+sale.billNo});
+    logHistory('Inventory','Sold', `${inv.itemName} (${inv.code}) sold via bill ${sale.billNo} — weight ${fmtWt(inv.weight)} and 1 unit removed from available stock`);
   });
 }
 /* Reverses the sold status on any inventory linked to this sale — used when
    a bill is voided or deleted, so stock stays accurate. */
 function releaseInventoryForSale(sale){
   DB.inventory.filter(inv=>inv.linkedSaleId===sale.id).forEach(inv=>{
-    inv.status='in-stock'; inv.linkedSaleId=null; inv.soldDate=null;
+    inv.status='available'; inv.linkedSaleId=null; inv.soldDate=null; inv.qty = (Number(inv.qty)||0)+1;
+    logInventoryMovement(inv.id, 'Sold → Available', {fromLocation:'Customer', toLocation:inv.location||'Showcase', weightChange:(Number(inv.weight)||0), reference:sale.billNo, notes:'Bill voided/deleted — item returned to stock'});
     logHistory('Inventory','Returned to Stock', `${inv.itemName} (${inv.code}) returned to stock — bill ${sale.billNo} was voided/deleted`);
   });
 }
@@ -1138,6 +1228,225 @@ function doPrint(saleId){
 ===================================================================== */
 function escapePdfText(s){ return String(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
 function toPdfSafeText(s){ return String(s).replace(/₹/g,'Rs ').replace(/[^\x00-\xFF]/g,'?'); }
+/* ---------------------------------------------------------------------
+   RICH PDF DRAWING ENGINE — absolute-position text + filled rectangles
+   + accurate text width (real Helvetica AFM widths), so PDFs can match
+   the app's actual maroon/gold visual design instead of plain text.
+--------------------------------------------------------------------- */
+const HELV_WIDTHS = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
+  556,556,556,556,556,556,556,556,556,556,
+  278,278,584,584,584,556,1015,
+  667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  278,278,278,469,556,333,
+  556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
+  334,260,334,584];
+function pdfTextWidth(text, size){
+  let w=0;
+  for(const ch of String(text)){
+    const code = ch.charCodeAt(0);
+    w += (code>=32 && code<=126) ? HELV_WIDTHS[code-32] : 556;
+  }
+  return w*size/1000;
+}
+function pdfColor(hex){
+  const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  return [r,g,b];
+}
+function PdfPage(){
+  this.ops = [];
+}
+PdfPage.prototype.rect = function(x,y,w,h,colorHex){
+  const [r,g,b]=pdfColor(colorHex);
+  this.ops.push(`${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg\n${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re f\n`);
+};
+PdfPage.prototype.strokeRect = function(x,y,w,h,colorHex,lineWidth){
+  const [r,g,b]=pdfColor(colorHex);
+  this.ops.push(`${lineWidth||1} w\n${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} RG\n${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re S\n`);
+};
+PdfPage.prototype.line = function(x1,y1,x2,y2,colorHex,lineWidth){
+  const [r,g,b]=pdfColor(colorHex||'#000000');
+  this.ops.push(`${lineWidth||1} w\n${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} RG\n${x1.toFixed(1)} ${y1.toFixed(1)} m ${x2.toFixed(1)} ${y2.toFixed(1)} l S\n`);
+};
+PdfPage.prototype.text = function(x,y,str,opts){
+  opts = opts||{};
+  const size = opts.size||10;
+  const safe = toPdfSafeText(str);
+  const font = opts.bold ? '/F2' : (opts.italic ? '/F3' : '/F1');
+  const w = pdfTextWidth(safe, size);
+  let tx = x;
+  if(opts.align==='right') tx = x-w; else if(opts.align==='center') tx = x-w/2;
+  const [r,g,b]=pdfColor(opts.colorHex||'#000000');
+  this.ops.push(`${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg\nBT ${font} ${size} Tf ${tx.toFixed(1)} ${y.toFixed(1)} Td (${escapePdfText(safe)}) Tj ET\n`);
+  return w;
+};
+PdfPage.prototype.stream = function(){ return this.ops.join(''); };
+function assemblePdfFromPages(pages){
+  const pageWidth=595, pageHeight=842;
+  const catalogNum=1, pagesNum=2, fontRegNum=3, fontBoldNum=4, fontItalicNum=5;
+  let nextObjNum=6;
+  const pageObjNums=[], contentObjNums=[], contentStrings=[];
+  pages.forEach(pb=>{
+    const contentNum=nextObjNum++; contentObjNums.push(contentNum);
+    const pageNum=nextObjNum++; pageObjNums.push(pageNum);
+    contentStrings.push(pb.stream());
+  });
+  const objMap = {};
+  objMap[catalogNum] = `<< /Type /Catalog /Pages ${pagesNum} 0 R >>`;
+  objMap[pagesNum] = `<< /Type /Pages /Kids [${pageObjNums.map(n=>n+' 0 R').join(' ')}] /Count ${pageObjNums.length} >>`;
+  objMap[fontRegNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`;
+  objMap[fontBoldNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>`;
+  objMap[fontItalicNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>`;
+  pageObjNums.forEach((pageNum,idx)=>{
+    objMap[pageNum] = `<< /Type /Page /Parent ${pagesNum} 0 R /Resources << /Font << /F1 ${fontRegNum} 0 R /F2 ${fontBoldNum} 0 R /F3 ${fontItalicNum} 0 R >> >> /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${contentObjNums[idx]} 0 R >>`;
+  });
+  contentObjNums.forEach((contentNum,idx)=>{
+    const stream = contentStrings[idx];
+    objMap[contentNum] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+  const maxObjNum = nextObjNum-1;
+  let pdf = '%PDF-1.4\n';
+  const offsets = {};
+  for(let n=1;n<=maxObjNum;n++){ offsets[n]=pdf.length; pdf += `${n} 0 obj\n${objMap[n]}\nendobj\n`; }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${maxObjNum+1}\n0000000000 65535 f \n`;
+  for(let n=1;n<=maxObjNum;n++){ pdf += String(offsets[n]).padStart(10,'0')+' 00000 n \n'; }
+  pdf += `trailer\n<< /Size ${maxObjNum+1} /Root ${catalogNum} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  const bytes = new Uint8Array(pdf.length);
+  for(let i=0;i<pdf.length;i++) bytes[i] = pdf.charCodeAt(i) & 0xFF;
+  return bytes;
+}
+/* Brand palette reused from the app's own CSS, in hex for the PDF engine */
+const PDF_BRAND = { maroonDark:'#450D17', maroon:'#6E1423', gold:'#AD8A3B', goldLight:'#E4D4A7', goldPale:'#F3EAD1', ink:'#2B2320', inkSoft:'#6B5F55', danger:'#AD3B32', success:'#2F7A4F', white:'#FFFFFF', line:'#EEE6D3' };
+
+/* A genuinely styled Sales bill PDF — mirrors the in-app bill's maroon
+   header, gold "TAX INVOICE" banner, striped item table, and boxed
+   total, using real fills/rects instead of plain text lines. */
+function buildStyledSaleBillPdf(s){
+  const m = DB.meta;
+  const cust = DB.customers.find(c=>c.id===s.customerId) || {};
+  const B = PDF_BRAND;
+  const pageW=595, marginX=40, contentW=pageW-marginX*2;
+  const rows = s.items.map(i=>{
+    const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
+    const pw=(i.weight||0)*(purity/100);
+    const amt=pw*(i.rate||0)+Number(i.making||0);
+    return {name:i.itemName, weight:i.weight, purity, rate:i.rate, making:i.making, amt};
+  });
+  const pages = []; let pb = new PdfPage(); pages.push(pb);
+  let y = 800;
+  // Header
+  const headerH = 78;
+  pb.rect(marginX, y-headerH, contentW, headerH, B.maroon);
+  pb.text(pageW/2, y-30, m.shopName, {size:22, bold:true, colorHex:B.white, align:'center'});
+  pb.text(pageW/2, y-48, m.location, {size:10, colorHex:B.goldLight, align:'center'});
+  const gstLine = [m.gstin?'GSTIN: '+m.gstin:'', m.bisLicenceNo?'BIS Licence: '+m.bisLicenceNo:''].filter(Boolean).join('     ');
+  if(gstLine) pb.text(pageW/2, y-62, gstLine, {size:9, colorHex:B.goldLight, align:'center'});
+  y -= headerH;
+  // Banner
+  pb.rect(marginX, y-22, contentW, 22, B.goldPale);
+  pb.text(pageW/2, y-16, 'TAX INVOICE', {size:12, bold:true, colorHex:B.maroonDark, align:'center'});
+  y -= 22;
+  // Meta row
+  y -= 24;
+  pb.text(marginX+6, y, 'BILL NO', {size:8.5, colorHex:B.inkSoft});
+  pb.text(marginX+6, y-13, s.billNo, {size:13, bold:true, colorHex:B.ink});
+  pb.text(pageW/2, y, 'DATE & TIME', {size:8.5, colorHex:B.inkSoft, align:'center'});
+  pb.text(pageW/2, y-13, new Date(s.createdAt||s.date).toLocaleString('en-IN'), {size:10, bold:true, colorHex:B.ink, align:'center'});
+  pb.text(pageW-marginX-6, y, 'CUSTOMER', {size:8.5, colorHex:B.inkSoft, align:'right'});
+  pb.text(pageW-marginX-6, y-13, s.customerName, {size:10, bold:true, colorHex:B.ink, align:'right'});
+  if(cust.phone) pb.text(pageW-marginX-6, y-25, cust.phone, {size:9, colorHex:B.inkSoft, align:'right'});
+  y -= 40;
+  // Item table header
+  const cols = { item:marginX+6, wt:300, purity:365, rate:430, making:485, amt:pageW-marginX-6 };
+  pb.rect(marginX, y-20, contentW, 20, B.goldPale);
+  pb.text(cols.item, y-14, 'ITEM', {size:9, bold:true, colorHex:B.maroonDark});
+  pb.text(cols.wt, y-14, 'WT', {size:9, bold:true, colorHex:B.maroonDark, align:'right'});
+  pb.text(cols.purity, y-14, 'PURITY', {size:9, bold:true, colorHex:B.maroonDark, align:'right'});
+  pb.text(cols.rate, y-14, 'RATE', {size:9, bold:true, colorHex:B.maroonDark, align:'right'});
+  pb.text(cols.making, y-14, 'MAKING', {size:9, bold:true, colorHex:B.maroonDark, align:'right'});
+  pb.text(cols.amt, y-14, 'AMOUNT', {size:9, bold:true, colorHex:B.maroonDark, align:'right'});
+  y -= 20;
+  rows.forEach((r,idx)=>{
+    if(y < 190){ pb = new PdfPage(); pages.push(pb); y = 800; pb.text(marginX, y, '(continued) '+s.billNo, {size:9, colorHex:B.inkSoft}); y -= 20; }
+    const rowH = 20;
+    if(idx%2===1) pb.rect(marginX, y-rowH, contentW, rowH, '#FBF8F1');
+    pb.text(cols.item, y-14, r.name, {size:10, colorHex:B.ink});
+    pb.text(cols.wt, y-14, r.weight+'g', {size:9.5, colorHex:B.ink, align:'right'});
+    pb.text(cols.purity, y-14, r.purity+'%', {size:9.5, colorHex:B.ink, align:'right'});
+    pb.text(cols.rate, y-14, fmtMoney(r.rate), {size:9.5, colorHex:B.ink, align:'right'});
+    pb.text(cols.making, y-14, fmtMoney(r.making), {size:9.5, colorHex:B.ink, align:'right'});
+    pb.text(cols.amt, y-14, fmtMoney(r.amt), {size:9.5, bold:true, colorHex:B.ink, align:'right'});
+    y -= rowH;
+  });
+  y -= 12;
+  if(y < 170){ pb = new PdfPage(); pages.push(pb); y = 800; }
+  // Totals box
+  const boxW=250, boxX=pageW-marginX-boxW, boxH=112;
+  pb.strokeRect(boxX, y-boxH, boxW, boxH, B.goldLight, 1);
+  pb.rect(boxX, y-boxH, boxW, boxH, B.goldPale);
+  let ty = y-16;
+  pb.text(boxX+12, ty, 'Subtotal', {size:10, colorHex:B.ink}); pb.text(boxX+boxW-12, ty, fmtMoney(s.subTotal), {size:10, colorHex:B.ink, align:'right'});
+  ty -= 16;
+  pb.text(boxX+12, ty, 'Discount', {size:10, colorHex:B.ink}); pb.text(boxX+boxW-12, ty, '- '+fmtMoney(s.discount), {size:10, colorHex:B.ink, align:'right'});
+  ty -= 4;
+  pb.line(boxX+12, ty, boxX+boxW-12, ty, B.gold, 0.7);
+  ty -= 20;
+  pb.text(boxX+12, ty, 'TOTAL', {size:16, bold:true, colorHex:B.maroonDark}); pb.text(boxX+boxW-12, ty, fmtMoney(s.grandTotal), {size:16, bold:true, colorHex:B.maroonDark, align:'right'});
+  ty -= 18;
+  pb.text(boxX+12, ty, 'Paid ('+s.paymentMode+')', {size:9.5, colorHex:B.ink}); pb.text(boxX+boxW-12, ty, fmtMoney(s.amountPaid), {size:9.5, colorHex:B.ink, align:'right'});
+  ty -= 14;
+  const balance = s.grandTotal-s.amountPaid;
+  pb.text(boxX+12, ty, 'Balance Due', {size:9.5, bold:balance>0, colorHex:balance>0?B.danger:B.ink}); pb.text(boxX+boxW-12, ty, fmtMoney(balance), {size:9.5, bold:balance>0, colorHex:balance>0?B.danger:B.ink, align:'right'});
+  y -= boxH+16;
+  pb.text(marginX+6, y, 'Amount in words: '+numberToWordsIndian(s.grandTotal), {size:9.5, italic:true, colorHex:B.inkSoft});
+  y -= 40;
+  pb.text(marginX+6, y, 'Thank you for your business.', {size:9.5, colorHex:B.inkSoft});
+  pb.line(pageW-marginX-160, y+22, pageW-marginX-6, y+22, B.ink, 1);
+  pb.text(pageW-marginX-83, y+10, m.signatureLine||'Signature', {size:9.5, colorHex:B.ink, align:'center'});
+  if(m.billTermsNote){
+    y -= 30;
+    pb.rect(marginX, y-24, contentW, 24, '#FBF8F1');
+    pb.text(marginX+6, y-16, m.billTermsNote, {size:7.5, colorHex:B.inkSoft});
+  }
+  const bytes = assemblePdfFromPages(pages);
+  return new Blob([bytes], {type:'application/pdf'});
+}
+/* Lighter styled version reused for Buying/Girvi/Job receipts — same
+   brand colors, simpler single-column layout. */
+function buildStyledReceiptPdf(docTitle, rows, extraNote){
+  const m = DB.meta;
+  const B = PDF_BRAND;
+  const pageW=595, marginX=40, contentW=pageW-marginX*2;
+  const pb = new PdfPage();
+  let y = 800;
+  const headerH = 62;
+  pb.rect(marginX, y-headerH, contentW, headerH, B.maroon);
+  pb.text(pageW/2, y-26, m.shopName, {size:18, bold:true, colorHex:B.white, align:'center'});
+  pb.text(pageW/2, y-42, m.location, {size:9.5, colorHex:B.goldLight, align:'center'});
+  const gstLine = [m.gstin?'GSTIN: '+m.gstin:'', m.bisLicenceNo?'BIS: '+m.bisLicenceNo:''].filter(Boolean).join('   ');
+  if(gstLine) pb.text(pageW/2, y-54, gstLine, {size:8.5, colorHex:B.goldLight, align:'center'});
+  y -= headerH;
+  pb.rect(marginX, y-20, contentW, 20, B.goldPale);
+  pb.text(pageW/2, y-14, docTitle.toUpperCase(), {size:11, bold:true, colorHex:B.maroonDark, align:'center'});
+  y -= 34;
+  rows.forEach((r,idx)=>{
+    if(idx%2===1) pb.rect(marginX, y-16, contentW, 16, '#FBF8F1');
+    pb.text(marginX+6, y-11, String(r[0]), {size:9.5, bold:true, colorHex:B.inkSoft});
+    pb.text(pageW-marginX-6, y-11, String(r[1]), {size:10, colorHex:B.ink, align:'right'});
+    y -= 18;
+  });
+  if(extraNote){
+    y -= 8;
+    pb.rect(marginX, y-26, contentW, 26, B.goldPale);
+    pb.text(marginX+6, y-16, String(extraNote).replace(/<[^>]+>/g,''), {size:8.5, colorHex:B.inkSoft});
+    y -= 26;
+  }
+  y -= 24;
+  pb.text(marginX+6, y, 'Thank you.', {size:9, colorHex:B.inkSoft});
+  const bytes = assemblePdfFromPages([pb]);
+  return new Blob([bytes], {type:'application/pdf'});
+}
+
 function buildPdfBytes(lineObjs){
   const pageWidth=595, pageHeight=842, marginX=50, topY=800, bottomY=50, defaultSize=10, defaultLeading=14;
   const laidOutPages = [];
@@ -1151,7 +1460,6 @@ function buildPdfBytes(lineObjs){
   });
   laidOutPages.push(current);
   if(laidOutPages.length===0) laidOutPages.push([]);
-
   const catalogNum=1, pagesNum=2, fontRegNum=3, fontBoldNum=4;
   let nextObjNum=5;
   const pageObjNums=[], contentObjNums=[], contentStrings=[];
@@ -1223,59 +1531,13 @@ async function sharePdfBlob(blob, filename, title){
 }
 async function shareBillPdf(saleId){
   const s = DB.sales.find(x=>x.id===saleId); if(!s) return;
-  const m = DB.meta;
-  const cust = DB.customers.find(c=>c.id===s.customerId) || {};
-  let L = [];
-  L.push({text:m.shopName, bold:true, size:18, big:true});
-  L.push({text:m.location, size:10});
-  if(m.gstin) L.push({text:'GSTIN: '+m.gstin, size:9});
-  if(m.bisLicenceNo) L.push({text:'BIS Licence: '+m.bisLicenceNo, size:9});
-  L.push({rule:true, leading:10});
-  L.push({text:'TAX INVOICE', bold:true, size:12});
-  L.push({text:'Bill No: '+s.billNo+'    Date: '+new Date(s.createdAt||s.date).toLocaleString('en-IN'), size:10});
-  L.push({text:'Customer: '+s.customerName+(cust.phone?'  ('+cust.phone+')':''), size:10});
-  L.push({rule:true, leading:12});
-  L.push({text:'Item', bold:true, size:10}); // header row rendered as plain text row for simplicity
-  s.items.forEach(i=>{
-    const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
-    const pw=(i.weight||0)*(purity/100);
-    const amt=pw*(i.rate||0)+Number(i.making||0);
-    L.push({text:i.itemName+'  —  '+i.weight+'g @ '+purity+'%  ×  Rs '+i.rate+(i.making?'  + making Rs '+i.making:''), size:10});
-    L.push({text:'   Amount: Rs '+Math.round(amt).toLocaleString('en-IN'), size:9.5});
-  });
-  L.push({rule:true, leading:12});
-  L.push({text:'Subtotal: Rs '+Math.round(s.subTotal).toLocaleString('en-IN'), size:10});
-  L.push({text:'Discount: - Rs '+Math.round(s.discount).toLocaleString('en-IN'), size:10});
-  L.push({text:'TOTAL: Rs '+Math.round(s.grandTotal).toLocaleString('en-IN'), bold:true, size:14, big:true});
-  L.push({text:'Paid ('+s.paymentMode+'): Rs '+Math.round(s.amountPaid).toLocaleString('en-IN'), size:10});
-  L.push({text:'Balance: Rs '+Math.round(s.grandTotal-s.amountPaid).toLocaleString('en-IN'), size:10});
-  L.push({text:'Amount in words: '+numberToWordsIndian(s.grandTotal), size:9});
-  L.push({rule:true, leading:16});
-  L.push({text:m.signatureLine||'Signature', size:9});
-  if(m.billTermsNote) L.push({text:m.billTermsNote, size:7.5});
-  const blob = pdfBlobFromLayout(L);
+  const blob = buildStyledSaleBillPdf(s);
   logHistory('Sales','PDF Shared', `Bill ${s.billNo} shared as PDF`);
   saveDB();
   await sharePdfBlob(blob, 'Bill-'+s.billNo+'.pdf', 'Bill '+s.billNo);
 }
-function receiptPdfLayout(docTitle, rows, extraNote){
-  const m = DB.meta;
-  let L = [];
-  L.push({text:m.shopName, bold:true, size:16, big:true});
-  L.push({text:m.location, size:10});
-  if(m.gstin) L.push({text:'GSTIN: '+m.gstin, size:9});
-  if(m.bisLicenceNo) L.push({text:'BIS Licence: '+m.bisLicenceNo, size:9});
-  L.push({rule:true, leading:10});
-  L.push({text:docTitle, bold:true, size:13});
-  L.push({rule:true, leading:10});
-  rows.forEach(r=> L.push({text:r[0]+': '+r[1], size:10}));
-  if(extraNote){ L.push({rule:true, leading:8}); L.push({text:String(extraNote).replace(/<[^>]+>/g,''), size:9}); }
-  L.push({rule:true, leading:14});
-  L.push({text:'Thank you.', size:9});
-  return L;
-}
 async function sharePdfReceipt(docTitle, rows, extraNote, filenamePrefix, historyModule, historyDesc){
-  const blob = pdfBlobFromLayout(receiptPdfLayout(docTitle, rows, extraNote));
+  const blob = buildStyledReceiptPdf(docTitle, rows, extraNote);
   if(historyModule) logHistory(historyModule, 'PDF Shared', historyDesc||(docTitle+' shared as PDF'));
   saveDB();
   await sharePdfBlob(blob, filenamePrefix+'.pdf', docTitle);
@@ -1575,7 +1837,9 @@ function renderGirviTable(){
     const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
     const tag = g.status==='active' ? (g.dueDate && g.dueDate<todayStr()?'<span class="tag tag-red">Overdue</span>':'<span class="tag tag-gold">Active</span>')
       : g.status==='redeemed' ? '<span class="tag tag-green">Redeemed</span>' : '<span class="tag tag-gray">Forfeited</span>';
-    html += `<tr><td>${fmtDate(g.date)}</td><td><span class="agingTag ${days>60&&g.status==='active'?'late':''}">${days} din</span></td><td>${g.customerName}</td><td>${g.itemDesc}${g.photo?' 📷':''}</td><td>${fmtWt(g.weight)}</td><td>${fmtMoney(principal)}</td><td>${g.interestRatePct}%</td><td>${tag}</td>
+    html += `<tr><td>${fmtDate(g.date)}</td><td><span class="agingTag ${days>60&&g.status==='active'?'late':''}">${days} din</span></td>
+      <td style="display:flex;align-items:center;gap:6px;">${g.photo?`<img src="${g.photo}" class="photoThumb" style="width:26px;height:26px;cursor:pointer;" onclick="openFullPhoto('${g.photo}','${g.customerName}')">`:''}${g.customerName}</td>
+      <td>${g.itemDesc}</td><td>${fmtWt(g.weight)}</td><td>${fmtMoney(principal)}</td><td>${g.interestRatePct}%</td><td>${tag}</td>
       <td><button class="btn btn-sm btn-outline" onclick="viewGirvi('${g.id}')">Manage</button></td></tr>`;
   });
   html += `</table>`;
@@ -1676,7 +1940,7 @@ function viewGirvi(id){
   const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
   let body = `
     <div class="girviDetailHead">
-      ${g.photo?`<img src="${g.photo}" class="photoThumb" style="width:64px;height:64px;">`:`<div class="photoPlaceholder" style="width:64px;height:64px;">📷</div>`}
+      ${g.photo?`<img src="${g.photo}" class="photoThumb" style="width:64px;height:64px;cursor:pointer;" onclick="openFullPhoto('${g.photo}','${g.customerName}')">`:`<div class="photoPlaceholder" style="width:64px;height:64px;">📷</div>`}
       <div>
         <div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${g.customerName}</div>
         <div class="helpText">${g.itemDesc} — ${fmtWt(g.weight)}, ${g.purity||100}% ${g.metal}</div>
@@ -1710,7 +1974,7 @@ function viewGirvi(id){
   foot.push({label:'📄 PDF', cls:'btn-outline', onClick:()=>sharePdfGirvi(g.id)});
   if(g.status==='active'){
     foot.push({label:'Redeem / Close', cls:'btn-primary', onClick:()=>{ closeModal(); redeemGirvi(g.id); }});
-    foot.push({label:'Forfeit', cls:'btn-danger', onClick:()=>{ closeModal(); forfeitGirvi(g.id); }});
+    foot.push({label:'Forfeit', cls:'btn-danger', onClick:()=>{ closeModal(); openForfeitForm(g.id); }});
   }
   foot.push({label:'🗑 Delete Loan', cls:'btn-danger', onClick:()=>deleteGirvi(g.id)});
   openModal('Girvi Khata — '+g.customerName, body, foot);
@@ -1920,19 +2184,88 @@ function redeemGirvi(id){
     saveDB(); renderGirvi(); toast('Marked as redeemed');
   });
 }
-function forfeitGirvi(id){
+function openForfeitForm(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
-  askOwnerApproval('Forfeiting means the shop keeps the item permanently since the customer did not repay. This requires owner approval.', ()=>{
-    g.status='forfeited';
-    g.transactions.push({id:uid('GTX'), date:todayStr(), type:'Forfeited', amount:0, note:'Item forfeited to shop'});
-    logHistory('Girvi','Forfeited', `${g.itemDesc} forfeited (customer: ${g.customerName})`);
-    saveDB(); renderGirvi(); toast('Item marked as forfeited');
+  const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
+  const interest = girviInterestDue(g);
+  const totalDue = principal + interest;
+  const body = `
+    <p class="helpText" style="margin-top:0;">Use this when a customer sells you the item they'd pledged, instead of redeeming it. Cutting the principal and accrued interest from what the item is worth, you hand over the remaining balance.</p>
+    <div class="totalsBox">
+      <div class="totalsRow"><span>Outstanding Principal</span><span>${fmtMoney(principal)}</span></div>
+      <div class="totalsRow"><span>Accrued Interest (estimate)</span><span>${fmtMoney(interest)}</span></div>
+      <div class="totalsRow grand"><span>Total Due</span><span>${fmtMoney(totalDue)}</span></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="field"><label>Forfeit Date</label><input type="date" id="ffDate" value="${todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>Final Settlement Amount Given to Customer</label><input type="number" id="ffSettlement" oninput="recalcForfeit(${totalDue})"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Extra — Above Principal + Interest</label><input type="number" id="ffExtra" readonly style="background:var(--bg);"></div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="ffNotes" placeholder="e.g. settled at today's market rate"></div>
+    <div id="ffCalcOut" class="approveBox" style="margin-top:12px;"></div>
+  `;
+  openModal('Forfeit — Settle & Buy Item', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Confirm Forfeit', cls:'btn-danger', onClick:()=>saveForfeit(id, totalDue, principal, interest)}
+  ]);
+}
+function recalcForfeit(totalDue){
+  const settlement = parseFloat(document.getElementById('ffSettlement').value)||0;
+  const extra = settlement - totalDue;
+  document.getElementById('ffExtra').value = extra.toFixed(2);
+  const out = document.getElementById('ffCalcOut');
+  out.innerHTML = extra>=0
+    ? `Settlement covers the full ${fmtMoney(totalDue)} due, plus <b>${fmtMoney(extra)}</b> extra paid to the customer for the item's value above the loan.`
+    : `⚠️ Settlement of ${fmtMoney(settlement)} is <b>less</b> than the ${fmtMoney(totalDue)} due — customer is receiving less than what they owe (short-settlement of ${fmtMoney(-extra)}).`;
+}
+function saveForfeit(id, totalDue, principal, interest){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const settlement = parseFloat(document.getElementById('ffSettlement').value);
+  if(isNaN(settlement) || settlement<0){ toast('Enter a valid settlement amount'); return; }
+  const date = document.getElementById('ffDate').value || todayStr();
+  const extra = settlement - totalDue;
+  const notes = document.getElementById('ffNotes').value || '';
+  askOwnerApproval('Forfeiting closes this girvi permanently and creates a Buying entry for the item. This requires owner approval.', ()=>{
+    g.status = 'forfeited';
+    g.outstandingPrincipal = 0;
+    g.transactions = g.transactions || [];
+    g.transactions.push({id:uid('GTX'), date, type:'Forfeited', amount:settlement, note:`Total due ${fmtMoney(totalDue)} (principal ${fmtMoney(principal)} + interest ${fmtMoney(interest)}), settlement ${fmtMoney(settlement)}${notes?' — '+notes:''}`});
+
+    const buying = {
+      id: uid('BUY'), date, createdAt: nowISO(), customerId: g.customerId, customerName: g.customerName,
+      itemDesc: g.itemDesc+' (ex-girvi, forfeited)', metal: g.metal, purity: g.purity||100, weight: g.weight,
+      rateApplied: g.weight>0 ? Math.round((settlement/((g.weight*(g.purity||100)/100))) * 100)/100 : 0,
+      amount: settlement, paymentMode:'Cash', linkedGirviId: g.id, deleted:false,
+      notes: `Forfeit settlement — principal ${fmtMoney(principal)} + interest ${fmtMoney(interest)} = due ${fmtMoney(totalDue)}; extra ${fmtMoney(extra)}${notes?'; '+notes:''}`
+    };
+    DB.buying.push(buying);
+    g.linkedBuyingId = buying.id;
+
+    if(g.linkedInventoryId){
+      const inv = DB.inventory.find(x=>x.id===g.linkedInventoryId && !x.deleted);
+      if(inv){
+        const oldLoc = inv.location;
+        inv.status = 'available'; inv.location = 'Showcase'; inv.linkedGirviId = null;
+        logInventoryMovement(inv.id, 'Pledged → Forfeited (now shop stock)', {fromLocation:oldLoc, toLocation:'Showcase', reference:'Girvi forfeit', notes});
+      }
+    }
+    logHistory('Girvi','Forfeited', `${g.itemDesc} forfeited for ${g.customerName} — settlement ${fmtMoney(settlement)}, Buying entry ${buying.id} created`);
+    logHistory('Buying','Created (Auto)', `Auto-created from girvi forfeit: ${buying.itemDesc} — ${fmtMoney(settlement)}`);
+    saveDB(); closeModal(); toast('Girvi forfeited — Buying entry created'); renderGirvi();
   });
 }
 
 /* =====================================================================
    PAGE: CREDIT / UDHAAR
 ===================================================================== */
+function creditOldestOverdueInfo(custId){
+  const debits = DB.creditEntries.filter(e=>e.customerId===custId && !e.deleted && e.type==='debit').sort((a,b)=>a.date.localeCompare(b.date));
+  if(debits.length===0) return null;
+  const oldest = debits[0];
+  const dueDate = oldest.dueDate || null;
+  const isOverdue = dueDate ? dueDate < todayStr() : daysBetween(oldest.date) > 30;
+  return {oldestDate: oldest.date, dueDate, isOverdue, daysOld: daysBetween(oldest.date)};
+}
 function renderCredit(){
   let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><div style="display:flex;gap:10px;">
     <button class="btn btn-outline" onclick="openAddCreditCustomerForm()">+ Mark Customer as Credit</button>
@@ -1947,16 +2280,55 @@ function renderCredit(){
   html += `<div class="statCard"><div class="lbl">Credit Customers</div><div class="val">${creditCustomers.length}</div></div>`;
   html += `</div>`;
   html += `<p class="helpText" style="margin-bottom:10px;">Only customers you've intentionally marked for credit show here — not your full customer list.</p>`;
-  html += `<div class="card"><table><tr><th>Customer</th><th>Phone</th><th>Balance Due</th><th></th></tr>`;
-  const withBal = creditCustomers.map(c=>({c,bal:customerBalance(c.id)})).sort((a,b)=>b.bal-a.bal);
-  if(withBal.length===0) html += `<tr><td colspan="4"><div class="empty"><div class="big">📒</div>No credit customers yet. Tap "+ Mark Customer as Credit" to add one.</div></td></tr>`;
-  withBal.forEach(({c,bal})=>{
-    html += `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
+  html += `<div class="card">
+    <div class="grid grid-3" style="margin-bottom:10px;">
+      <input id="creditSearch" placeholder="Search by name or phone..." oninput="renderCreditTable()">
+      <select id="creditSort" onchange="renderCreditTable()">
+        <option value="balance_desc">Balance Due (High to Low)</option>
+        <option value="balance_asc">Balance Due (Low to High)</option>
+        <option value="name">Customer Name (A-Z)</option>
+        <option value="oldest_date">Oldest Udhaar First</option>
+        <option value="due_date">Due Date (Soonest)</option>
+      </select>
+      <select id="creditStatusFilter" onchange="renderCreditTable()">
+        <option value="">All</option>
+        <option value="due">Has Balance Due</option>
+        <option value="overdue">Overdue</option>
+        <option value="paid">Fully Paid</option>
+      </select>
+    </div>
+    <div id="creditTableWrap"></div>
+  </div>`;
+  document.getElementById('content').innerHTML = html;
+  renderCreditTable();
+}
+function renderCreditTable(){
+  const q = (document.getElementById('creditSearch')?.value||'').toLowerCase();
+  const sortBy = document.getElementById('creditSort')?.value||'balance_desc';
+  const statusF = document.getElementById('creditStatusFilter')?.value||'';
+  let rows = DB.customers.filter(c=>c.creditEnabled).map(c=>({c, bal:customerBalance(c.id), overdueInfo:creditOldestOverdueInfo(c.id)}));
+  if(q) rows = rows.filter(({c})=> c.name.toLowerCase().includes(q) || (c.phone||'').includes(q));
+  if(statusF==='due') rows = rows.filter(({bal})=>bal>0);
+  else if(statusF==='overdue') rows = rows.filter(({bal,overdueInfo})=>bal>0 && overdueInfo && overdueInfo.isOverdue);
+  else if(statusF==='paid') rows = rows.filter(({bal})=>bal<=0);
+  const sorters = {
+    balance_desc: (a,b)=>b.bal-a.bal, balance_asc: (a,b)=>a.bal-b.bal,
+    name: (a,b)=>a.c.name.localeCompare(b.c.name),
+    oldest_date: (a,b)=> (a.overdueInfo?a.overdueInfo.oldestDate:'9999') .localeCompare(b.overdueInfo?b.overdueInfo.oldestDate:'9999'),
+    due_date: (a,b)=> (a.overdueInfo&&a.overdueInfo.dueDate?a.overdueInfo.dueDate:'9999').localeCompare(b.overdueInfo&&b.overdueInfo.dueDate?b.overdueInfo.dueDate:'9999')
+  };
+  rows.sort(sorters[sortBy]||sorters.balance_desc);
+  let html = `<table><tr><th>Customer</th><th>Phone</th><th>Balance Due</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="5"><div class="empty"><div class="big">📒</div>No matching credit customers. Tap "+ Mark Customer as Credit" to add one.</div></td></tr>`;
+  rows.forEach(({c,bal,overdueInfo})=>{
+    const isOverdue = bal>0 && overdueInfo && overdueInfo.isOverdue;
+    const statusTag = bal<=0 ? '<span class="tag tag-green">Paid</span>' : (isOverdue ? '<span class="tag tag-red">Overdue</span>' : '<span class="tag tag-gold">Active Due</span>');
+    html += `<tr style="${isOverdue?'background:#FBEAE8;':''}"><td>${c.name}</td><td>${c.phone||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td><td>${statusTag}</td>
     <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View Ledger</button>
     <button class="btn btn-sm btn-danger" onclick="unmarkCreditCustomer('${c.id}')">Remove from Credit</button></td></tr>`;
   });
-  html += `</table></div>`;
-  document.getElementById('content').innerHTML = html;
+  html += `</table>`;
+  document.getElementById('creditTableWrap').innerHTML = html;
 }
 function openAddCreditCustomerForm(){
   const eligible = DB.customers.filter(c=>!c.creditEnabled);
@@ -1994,9 +2366,10 @@ function openCreditForm(prefillName){
       <div class="field"><label>${T('date')} <span class="helpText">(back-date allowed)</span></label><input type="date" id="crDate" value="${todayStr()}" max="${todayStr()}"></div>
     </div>
     <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Entry Type</label><select id="crType"><option value="debit">Udhaar Given (they owe more)</option><option value="credit">Payment Received (reduce due)</option></select></div>
+      <div class="field"><label>Entry Type</label><select id="crType" onchange="document.getElementById('crDueWrap').style.display=this.value==='debit'?'block':'none'"><option value="debit">Udhaar Given (they owe more)</option><option value="credit">Payment Received (reduce due)</option></select></div>
       <div class="field"><label>Amount</label><input type="number" id="crAmount"></div>
     </div>
+    <div class="field" id="crDueWrap" style="margin-top:12px;"><label>Due Date (optional)</label><input type="date" id="crDueDate"></div>
     <div class="field" style="margin-top:12px;"><label>Note</label><input id="crDesc" placeholder="Reason / description"></div>
   `;
   openModal('New Credit Entry', body, [
@@ -2011,7 +2384,8 @@ function saveCredit(){
   const amt = parseFloat(document.getElementById('crAmount').value)||0;
   const type = document.getElementById('crType').value;
   const crDate = document.getElementById('crDate').value || todayStr();
-  DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:crDate, type, amount:amt, description:document.getElementById('crDesc').value||'Manual entry', createdAt:nowISO()});
+  const dueDate = type==='debit' ? (document.getElementById('crDueDate').value||'') : '';
+  DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:crDate, dueDate, type, amount:amt, description:document.getElementById('crDesc').value||'Manual entry', createdAt:nowISO()});
   if(!cust.creditEnabled){ cust.creditEnabled = true; logHistory('Customer','Credit Enabled', cust.name+' auto-marked as credit customer (first entry created)'); }
   logHistory('Credit','Created', `${type==='debit'?'Udhaar added':'Payment received'} — ${fmtMoney(amt)} (${cust.name})`);
   saveDB(); closeModal(); toast('Entry saved'); renderCredit();
@@ -2020,23 +2394,114 @@ function saveCredit(){
 /* =====================================================================
    PAGE: INVENTORY
 ===================================================================== */
+/* =====================================================================
+   PAGE: INVENTORY — masterclass module.
+   Item Master + Stock Lots + Components + Movement Ledger, all tabbed.
+   Status/location vocabulary is ADDITIVE: old items stored with
+   status:'in-stock' keep that value forever — invIsAvailable() treats
+   'in-stock' and 'available' as the same thing everywhere, so nothing
+   old needs to be rewritten.
+===================================================================== */
+const INV_STATUSES = ['available','reserved','under-repair','in-manufacturing','pledged','exchanged','damaged','melted','returned','sold'];
+const INV_LOCATIONS = ['Showcase','Vault','Workshop','Repair','In Transit','Customer','Other'];
+function invIsAvailable(item){ return item.status==='available' || item.status==='in-stock'; }
+function invStatusLabel(status){
+  if(status==='in-stock') return 'Available';
+  return (status||'available').split('-').map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+}
+function invStatusTagClass(status){
+  if(invIsAvailable({status})) return 'tag-green';
+  if(['reserved','under-repair','in-manufacturing'].includes(status)) return 'tag-gold';
+  if(['pledged','damaged'].includes(status)) return 'tag-red';
+  return 'tag-gray';
+}
+function logInventoryMovement(itemId, type, opts){
+  opts = opts||{};
+  DB.inventoryMovements.push({
+    id: uid('MOV'), itemId, type, date: todayStr(), createdAt: nowISO(),
+    fromLocation: opts.fromLocation||'', toLocation: opts.toLocation||'',
+    weightChange: opts.weightChange||0, reference: opts.reference||'', notes: opts.notes||'', deleted:false
+  });
+}
+function setInvStatus(id, newStatus, newLocation, reference, notes, silent){
+  const item = DB.inventory.find(x=>x.id===id); if(!item) return;
+  const oldStatus=item.status, oldLoc=item.location;
+  item.status = newStatus; if(newLocation) item.location = newLocation;
+  logInventoryMovement(id, invStatusLabel(oldStatus)+' → '+invStatusLabel(newStatus), {fromLocation:oldLoc, toLocation:item.location, reference, notes});
+  logHistory('Inventory','Status Changed', `${item.itemName} (${item.code}): ${invStatusLabel(oldStatus)} → ${invStatusLabel(newStatus)}`);
+  if(!silent) saveDB();
+}
 function renderInventory(){
-  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openInvForm()">+ Add Item</button></div>`;
-  html += `<div class="card"><div class="searchBar"><input id="invSearch" placeholder="Search item / code..." oninput="renderInvTable()"></div><div id="invTableWrap"></div></div>`;
+  window._invTab = window._invTab || 'items';
+  let html = `<div class="pillTabs">
+    <div class="pillTab ${window._invTab==='items'?'active':''}" onclick="setInvTab(this,'items')">Item Master</div>
+    <div class="pillTab ${window._invTab==='lots'?'active':''}" onclick="setInvTab(this,'lots')">Stock Lots</div>
+    <div class="pillTab ${window._invTab==='components'?'active':''}" onclick="setInvTab(this,'components')">Components</div>
+    <div class="pillTab ${window._invTab==='movements'?'active':''}" onclick="setInvTab(this,'movements')">Movements</div>
+  </div>
+  <div id="invTabBody"></div>`;
   document.getElementById('content').innerHTML = html;
+  renderInvTabBody();
+}
+function setInvTab(el, tab){
+  window._invTab = tab;
+  document.querySelectorAll('#content .pillTab').forEach(p=>p.classList.remove('active')); el.classList.add('active');
+  renderInvTabBody();
+}
+function renderInvTabBody(){
+  const wrap = document.getElementById('invTabBody'); if(!wrap) return;
+  if(window._invTab==='items') renderInvItemsTab(wrap);
+  else if(window._invTab==='lots') renderInvLotsTab(wrap);
+  else if(window._invTab==='components') renderInvComponentsTab(wrap);
+  else renderInvMovementsTab(wrap);
+}
+
+/* ---- ITEM MASTER ---- */
+function renderInvItemsTab(wrap){
+  const items = DB.inventory.filter(i=>!i.deleted);
+  const totalWeight = {Gold:0, Silver:0};
+  let totalValue = 0;
+  items.filter(invIsAvailable).forEach(i=>{
+    const purity = parseFloat(i.purity)||100;
+    const pw = (Number(i.weight)||0)*(purity/100);
+    if(i.category==='Gold') totalWeight.Gold += Number(i.weight)||0;
+    else if(i.category==='Silver') totalWeight.Silver += Number(i.weight)||0;
+    const rate = i.category==='Gold' ? DB.currentRates.gold22/10 : DB.currentRates.silverKg/1000;
+    totalValue += pw*rate;
+  });
+  let html = `<div class="statGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px;">
+    <div class="statCard"><div class="lbl">Available Items</div><div class="val">${items.filter(invIsAvailable).length}</div></div>
+    <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Gold / Silver Weight</div><div class="val" style="font-size:18px;">${fmtWt(totalWeight.Gold)} / ${fmtWt(totalWeight.Silver)}</div></div>
+    <div class="statCard" style="border-color:var(--success)"><div class="lbl">Est. Stock Value</div><div class="val" style="font-size:18px;">${fmtMoney(totalValue)}</div></div>
+    <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Pledged / Repair / Mfg</div><div class="val" style="font-size:18px;">${items.filter(i=>i.status==='pledged').length} / ${items.filter(i=>i.status==='under-repair').length} / ${items.filter(i=>i.status==='in-manufacturing').length}</div></div>
+  </div>`;
+  html += `<div class="cardHead" style="margin-bottom:10px;"><div></div><button class="btn btn-primary" onclick="openInvForm()">+ Add Item</button></div>`;
+  html += `<div class="card">
+    <div class="grid grid-3" style="margin-bottom:12px;">
+      <input id="invSearch" placeholder="Search item / code / HUID..." oninput="renderInvTable()">
+      <select id="invStatusFilter" onchange="renderInvTable()"><option value="">All Statuses</option>${INV_STATUSES.map(s=>`<option value="${s}">${invStatusLabel(s)}</option>`).join('')}</select>
+      <select id="invLocationFilter" onchange="renderInvTable()"><option value="">All Locations</option>${INV_LOCATIONS.map(l=>`<option value="${l}">${l}</option>`).join('')}</select>
+    </div>
+    <div id="invTableWrap"></div>
+  </div>`;
+  wrap.innerHTML = html;
   renderInvTable();
 }
 function renderInvTable(){
   const q = (document.getElementById('invSearch')?.value||'').toLowerCase();
+  const statusF = document.getElementById('invStatusFilter')?.value||'';
+  const locF = document.getElementById('invLocationFilter')?.value||'';
   let rows = [...DB.inventory].filter(i=>!i.deleted).sort((a,b)=>b.addedDate.localeCompare(a.addedDate));
-  if(q) rows = rows.filter(i=> [i.itemName,i.code,i.subcategory,i.designGroup,i.style,i.batchNo,i.karigarSource].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
-  let html = `<table><tr><th>Code</th><th>Item</th><th>Category / Variant</th><th>Wt</th><th>Purity</th><th>Qty</th><th>Status</th><th></th></tr>`;
-  if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">💍</div>No inventory items yet.</div></td></tr>`;
+  if(q) rows = rows.filter(i=> [i.itemName,i.code,i.subcategory,i.designGroup,i.style,i.batchNo,i.karigarSource,i.huid,i.hallmarkNumber].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
+  if(statusF) rows = rows.filter(i=> statusF==='available' ? invIsAvailable(i) : i.status===statusF);
+  if(locF) rows = rows.filter(i=> (i.location||'Showcase')===locF);
+  let html = `<table><tr><th>Code</th><th>Item</th><th>Category / Variant</th><th>Wt</th><th>Purity</th><th>Status</th><th>Location</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">💍</div>No inventory items match.</div></td></tr>`;
   rows.forEach(i=>{
     const variantBits = [i.subcategory,i.designGroup,i.size,i.pairSingle,i.style,i.stoneOrNot].filter(Boolean);
-    html += `<tr><td>${i.code}</td><td>${i.itemName}${i.pieceCount>1?' ('+i.pieceCount+' pc)':''}</td><td>${i.category}${variantBits.length?'<br><span class="helpText">'+variantBits.join(' • ')+'</span>':''}</td><td>${fmtWt(i.weight)}</td><td>${i.purity}</td><td>${i.qty}</td>
-    <td>${i.status==='in-stock'?'<span class="tag tag-green">In Stock</span>':'<span class="tag tag-gray">Sold</span>'}</td>
-    <td>${i.status==='in-stock'?`<button class="btn btn-sm btn-outline" onclick="markSold('${i.id}')">Mark Sold</button>`:''}
+    html += `<tr><td>${i.code}${i.huid?' <span class="helpText">HUID</span>':''}</td><td>${i.itemName}${i.pieceCount>1?' ('+i.pieceCount+' pc)':''}</td><td>${i.category}${variantBits.length?'<br><span class="helpText">'+variantBits.join(' • ')+'</span>':''}</td><td>${fmtWt(i.weight)}</td><td>${i.purity}</td>
+    <td><span class="tag ${invStatusTagClass(i.status)}">${invStatusLabel(i.status)}</span></td><td>${i.location||'Showcase'}</td>
+    <td>${invIsAvailable(i)?`<button class="btn btn-sm btn-outline" onclick="markSold('${i.id}')">Mark Sold</button>`:''}
     <button class="btn btn-sm btn-ghost" onclick="viewInvDetails('${i.id}')">👁</button>
     <button class="btn btn-sm btn-ghost" onclick="guardEdit('inventory item', ()=>openInvForm('${i.id}'))">✎</button>
     <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">🗑</button></td></tr>`;
@@ -2049,11 +2514,28 @@ function viewInvDetails(id){
   const rows = [
     ['Code', i.code], ['Item Name', i.itemName], ['Category', i.category], ['Subcategory', i.subcategory],
     ['Design Group', i.designGroup], ['Size', i.size], ['Pair / Single', i.pairSingle], ['Style', i.style],
-    ['Stone', i.stoneOrNot], ['Custom Attributes', i.customAttr], ['Batch / Lot No.', i.batchNo],
-    ['Karigar Source', i.karigarSource], ['Weight Type', i.weightType], ['Piece Count', i.pieceCount],
-    ['Weight', fmtWt(i.weight)], ['Purity', i.purity], ['Qty', i.qty], ['Remarks', i.remarks], ['Status', i.status]
+    ['Stone', i.stoneOrNot], ['Stone Type', i.stoneType], ['Stone Count', i.stoneCount], ['Stone Carat', i.stoneCarat],
+    ['Custom Attributes', i.customAttr], ['Batch / Lot No.', i.batchNo], ['Karigar / Supplier', i.karigarSource],
+    ['Weight Type', i.weightType], ['Piece Count', i.pieceCount], ['Gross Weight', i.grossWeight?fmtWt(i.grossWeight):''],
+    ['Net Weight', i.netWeight?fmtWt(i.netWeight):''], ['Weight', fmtWt(i.weight)], ['Purity', i.purity], ['Qty', i.qty],
+    ['Cost Price', i.costPrice?fmtMoney(i.costPrice):''], ['Selling Price', i.sellingPrice?fmtMoney(i.sellingPrice):''],
+    ['HUID', i.huid], ['Hallmark No.', i.hallmarkNumber], ['Hallmark Status', i.hallmarkStatus],
+    ['Hallmark Cert Details', i.hallmarkCertDetails], ['Manufacturing Date', i.mfgDate?fmtDate(i.mfgDate):''],
+    ['Location', i.location], ['Tags', i.tags], ['Remarks', i.remarks], ['Status', invStatusLabel(i.status)]
   ].filter(([k,v])=> v!==undefined && v!==null && v!=='');
-  let body = `<table>${rows.map(([k,v])=>`<tr><td style="font-weight:600;width:40%;">${k}</td><td>${v}</td></tr>`).join('')}</table>`;
+  let body = `<div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px;">
+    <div style="flex-shrink:0;">${(i.photos&&i.photos[0])?`<img src="${i.photos[0]}" class="photoThumb" style="width:80px;height:80px;">`:`<div class="photoPlaceholder" style="width:80px;height:80px;">💍</div>`}</div>
+    <div>
+      <div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${i.itemName}</div>
+      <div class="helpText">${i.code}</div>
+      <span class="tag ${invStatusTagClass(i.status)}" style="margin-top:4px;display:inline-block;">${invStatusLabel(i.status)}</span>
+      <span class="tag tag-gray" style="margin-top:4px;">${i.location||'Showcase'}</span>
+    </div>
+  </div>`;
+  if(i.photos && i.photos.length>1){
+    body += `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">${i.photos.map(p=>`<img src="${p}" class="photoThumb" style="width:56px;height:56px;">`).join('')}</div>`;
+  }
+  body += `<table>${rows.map(([k,v])=>`<tr><td style="font-weight:600;width:42%;">${k}</td><td>${v}</td></tr>`).join('')}</table>`;
   if(i.sourceType==='Wholesaler Made' && i.billingPurity){
     const w = DB.wholesalers.find(x=>x.id===i.wholesalerId);
     const weight = Number(i.weight)||0, billingPurity = Number(i.billingPurity)||0, making = Number(i.wholesalerMakingPerGram)||0;
@@ -2063,18 +2545,54 @@ function viewInvDetails(id){
     const totalCost = billedWeight*rate + weight*making;
     body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 8px;">🏭 Wholesaler Making Cost</h4>
       <table>
-        <tr><td style="font-weight:600;width:40%;">Wholesaler</td><td>${w?w.name:'-'}</td></tr>
+        <tr><td style="font-weight:600;width:42%;">Wholesaler</td><td>${w?w.name:'-'}</td></tr>
         <tr><td style="font-weight:600;">Actual Purity</td><td>${i.actualPurity||'-'}%</td></tr>
         <tr><td style="font-weight:600;">Billed At Purity</td><td>${billingPurity}%</td></tr>
         <tr><td style="font-weight:600;">Making</td><td>${fmtMoney(making)}/g</td></tr>
         <tr><td style="font-weight:600;">Your Total Cost</td><td><b>${fmtMoney(totalCost)}</b></td></tr>
       </table>`;
   }
-  openModal(i.itemName+' — Details', body, [{label:'Close', cls:'btn-ghost', onClick:closeModal}]);
+  if(i.costPrice && i.sellingPrice){
+    const margin = Number(i.sellingPrice) - Number(i.costPrice);
+    const marginPct = Number(i.costPrice)>0 ? (margin/Number(i.costPrice)*100) : 0;
+    body += `<div class="approveBox" style="margin-top:14px;">💰 Estimated margin: <b>${fmtMoney(margin)}</b> (${marginPct.toFixed(1)}%)</div>`;
+  }
+  const movements = DB.inventoryMovements.filter(m=>m.itemId===id && !m.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  body += `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:16px 0 4px;">Movement Timeline</h4>
+    <div class="txnList">${movements.map(m=>`<div class="txnRow"><span>${m.type}${m.reference?' • '+m.reference:''}${m.notes?' — '+m.notes:''}</span><span class="helpText">${fmtDate(m.date)}</span></div>`).join('') || '<div class="txnRow">No movements logged yet.</div>'}</div>`;
+  const links = [];
+  if(i.linkedGirviId) links.push({label:'View Linked Girvi', action:()=>{ closeModal(); viewGirvi(i.linkedGirviId); }});
+  if(i.linkedJobId) links.push({label:'View Linked Job', action:()=>{ closeModal(); goTo('jobs'); }});
+  if(i.linkedSaleId) links.push({label:'View Linked Sale', action:()=>{ closeModal(); viewSale(i.linkedSaleId); }});
+  const foot = [{label:'Close', cls:'btn-ghost', onClick:closeModal}];
+  foot.push({label:'🔀 Change Status/Location', cls:'btn-outline', onClick:()=>{ guardEdit('inventory item status', ()=>{ closeModal(); openInvStatusForm(id); }); }});
+  foot.push({label:'🏷 Print Label', cls:'btn-gold', onClick:()=>printInvLabel(id)});
+  links.forEach(l=> foot.push({label:l.label, cls:'btn-ghost', onClick:l.action}));
+  openModal(i.itemName+' — Details', body, foot);
 }
+function openInvStatusForm(id){
+  const i = DB.inventory.find(x=>x.id===id); if(!i) return;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Status</label><select id="isvStatus">${INV_STATUSES.map(s=>`<option value="${s}" ${i.status===s||(s==='available'&&invIsAvailable(i))?'selected':''}>${invStatusLabel(s)}</option>`).join('')}</select></div>
+      <div class="field"><label>Location</label><select id="isvLocation">${INV_LOCATIONS.map(l=>`<option value="${l}" ${(i.location||'Showcase')===l?'selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Reference (optional)</label><input id="isvRef" placeholder="e.g. bill no, job id"></div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="isvNotes"></div>
+  `;
+  openModal('Change Status / Location — '+i.itemName, body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Save', cls:'btn-primary', onClick:()=>{
+      setInvStatus(id, document.getElementById('isvStatus').value, document.getElementById('isvLocation').value, document.getElementById('isvRef').value, document.getElementById('isvNotes').value);
+      saveDB(); closeModal(); toast('Status updated'); renderInventory();
+    }}
+  ]);
+}
+let invPhotoData = [];
 function openInvForm(id){
   const item = id ? DB.inventory.find(x=>x.id===id) : null;
   const code = item ? item.code : 'GJ-' + (DB.inventory.length+1001);
+  invPhotoData = item && item.photos ? [...item.photos] : (item&&item.photo?[item.photo]:[]);
   const v = (f,d)=> item&&item[f]!==undefined?item[f]:(d||'');
   const body = `
     <div class="grid grid-2">
@@ -2109,15 +2627,60 @@ function openInvForm(id){
         <div class="field"><label>Batch / Lot No.</label><input id="invBatchNo" value="${v('batchNo')}"></div>
       </div>
       <div class="grid grid-2" style="margin-top:12px;">
-        <div class="field"><label>Karigar Source</label><input id="invKarigarSource" placeholder="Who made/supplied it" value="${v('karigarSource')}"></div>
+        <div class="field"><label>Karigar / Supplier Source</label><input id="invKarigarSource" placeholder="Who made/supplied it" value="${v('karigarSource')}"></div>
         <div class="field"><label>Custom Attributes</label><input id="invCustomAttr" placeholder="Anything else, free text" value="${v('customAttr')}"></div>
       </div>
       <div class="field" style="margin-top:12px;"><label>Remarks</label><input id="invRemarks" value="${v('remarks')}"></div>
     </div>
     <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">⚖️ Detailed weight breakdown &amp; stone details (optional)</p>
+      <div class="grid grid-3">
+        <div class="field"><label>Gross Weight</label><input type="number" step="0.001" id="invGrossWeight" value="${v('grossWeight')}"></div>
+        <div class="field"><label>Net Weight</label><input type="number" step="0.001" id="invNetWeight" value="${v('netWeight')}"></div>
+        <div class="field"><label>Stone Type</label><input id="invStoneType" placeholder="e.g. Kundan, CZ" value="${v('stoneType')}"></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:12px;">
+        <div class="field"><label>Stone Count</label><input type="number" id="invStoneCount" value="${v('stoneCount')}"></div>
+        <div class="field"><label>Stone Carat</label><input type="number" step="0.01" id="invStoneCarat" value="${v('stoneCarat')}"></div>
+        <div class="field"><label>Stone Color/Clarity</label><input id="invStoneColor" value="${v('stoneColor')}"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">📜 BIS Hallmark Compliance (optional)</p>
+      <div class="grid grid-3">
+        <div class="field"><label>HUID</label><input id="invHuid" placeholder="6-digit HUID" value="${v('huid')}"></div>
+        <div class="field"><label>Hallmark Number</label><input id="invHallmarkNo" value="${v('hallmarkNumber')}"></div>
+        <div class="field"><label>Hallmark Status</label><select id="invHallmarkStatus">
+          <option value="Not Hallmarked" ${v('hallmarkStatus')==='Not Hallmarked'||!v('hallmarkStatus')?'selected':''}>Not Hallmarked</option>
+          <option value="Hallmarked" ${v('hallmarkStatus')==='Hallmarked'?'selected':''}>Hallmarked</option>
+          <option value="Pending" ${v('hallmarkStatus')==='Pending'?'selected':''}>Pending</option>
+        </select></div>
+      </div>
+      <div class="field" style="margin-top:12px;"><label>Hallmark Certificate Details</label><input id="invHallmarkCert" value="${v('hallmarkCertDetails')}"></div>
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">💰 Valuation &amp; 📍 Location (optional)</p>
+      <div class="grid grid-3">
+        <div class="field"><label>Cost Price</label><input type="number" id="invCostPrice" value="${v('costPrice')}"></div>
+        <div class="field"><label>Selling Price</label><input type="number" id="invSellingPrice" value="${v('sellingPrice')}"></div>
+        <div class="field"><label>Location</label><select id="invLocation">${INV_LOCATIONS.map(l=>`<option ${(v('location')||'Showcase')===l?'selected':''}>${l}</option>`).join('')}</select></div>
+      </div>
+      <div class="grid grid-2" style="margin-top:12px;">
+        <div class="field"><label>Manufacturing Date</label><input type="date" id="invMfgDate" value="${v('mfgDate')}" max="${todayStr()}"></div>
+        <div class="field"><label>Tags</label><input id="invTags" placeholder="e.g. bridal, daily wear, tribal" value="${v('tags')}"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">📷 Photos</p>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div id="invPhotoPreviewWrap" style="display:flex;gap:8px;flex-wrap:wrap;">${invPhotoData.map((p,idx)=>`<img src="${p}" class="photoThumb" style="width:56px;height:56px;">`).join('')}</div>
+        <input type="file" accept="image/*" capture="environment" id="invPhotoInput" onchange="handleInvPhoto(event)">
+      </div>
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
       <p class="helpText" style="margin-top:0;">🏭 <b>Wholesaler Making Cost</b> — if this item was got made through a wholesaler who bills you at a different purity than the item's actual purity (plus a making charge), record it here to see your true cost.</p>
       <div class="grid grid-2">
-        <div class="field"><label>Source</label><select id="invSourceType" onchange="toggleInvWholesalerFields()">
+        <div class="field"><label>Source</label><select id="invSourceType">
           <option value="" ${!v('sourceType')?'selected':''}>-</option>
           <option value="Own Stock" ${v('sourceType')==='Own Stock'?'selected':''}>Own Stock / Self Made</option>
           <option value="Wholesaler Made" ${v('sourceType')==='Wholesaler Made'?'selected':''}>Made via Wholesaler</option>
@@ -2142,7 +2705,13 @@ function openInvForm(id){
   ]);
   recalcInvCost();
 }
-function toggleInvWholesalerFields(){ /* placeholder for future conditional show/hide; fields stay visible for simplicity */ }
+function handleInvPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  compressImageFile(file, 320, 0.6, (dataUrl)=>{
+    invPhotoData.push(dataUrl);
+    document.getElementById('invPhotoPreviewWrap').innerHTML = invPhotoData.map(p=>`<img src="${p}" class="photoThumb" style="width:56px;height:56px;">`).join('');
+  });
+}
 function recalcInvCost(){
   const out = document.getElementById('invCostOut'); if(!out) return;
   const weight = parseFloat(document.getElementById('invWeight')?.value)||0;
@@ -2177,7 +2746,15 @@ function saveInv(id){
     customAttr: document.getElementById('invCustomAttr').value, remarks: document.getElementById('invRemarks').value,
     sourceType: document.getElementById('invSourceType').value, wholesalerId: document.getElementById('invWholesalerId').value,
     actualPurity: document.getElementById('invActualPurity').value, billingPurity: document.getElementById('invBillingPurity').value,
-    wholesalerMakingPerGram: document.getElementById('invWholesalerMaking').value, wholesalerRateUsed: document.getElementById('invWholesalerRate').value
+    wholesalerMakingPerGram: document.getElementById('invWholesalerMaking').value, wholesalerRateUsed: document.getElementById('invWholesalerRate').value,
+    grossWeight: document.getElementById('invGrossWeight').value, netWeight: document.getElementById('invNetWeight').value,
+    stoneType: document.getElementById('invStoneType').value, stoneCount: document.getElementById('invStoneCount').value,
+    stoneCarat: document.getElementById('invStoneCarat').value, stoneColor: document.getElementById('invStoneColor').value,
+    huid: document.getElementById('invHuid').value, hallmarkNumber: document.getElementById('invHallmarkNo').value,
+    hallmarkStatus: document.getElementById('invHallmarkStatus').value, hallmarkCertDetails: document.getElementById('invHallmarkCert').value,
+    costPrice: document.getElementById('invCostPrice').value, sellingPrice: document.getElementById('invSellingPrice').value,
+    location: document.getElementById('invLocation').value, mfgDate: document.getElementById('invMfgDate').value,
+    tags: document.getElementById('invTags').value, photos: [...invPhotoData]
   };
   if(id){
     const item = DB.inventory.find(x=>x.id===id); if(!item) return;
@@ -2193,9 +2770,10 @@ function saveInv(id){
     id:uid('INV'), code:document.getElementById('invCode').value, category:document.getElementById('invCategory').value,
     itemName:name, weight:parseFloat(document.getElementById('invWeight').value)||0,
     purity:document.getElementById('invPurity').value, qty:parseInt(document.getElementById('invQty').value)||1,
-    status:'in-stock', addedDate: todayStr(), ...extra
+    status:'available', addedDate: todayStr(), ...extra
   };
   DB.inventory.push(item);
+  logInventoryMovement(item.id, 'Added to Stock', {toLocation:item.location||'Showcase', reference:item.batchNo, notes:'Initial entry'});
   logHistory('Inventory','Added', `${item.itemName} (${item.code}) added to stock`);
   saveDB(); closeModal(); toast('Item added'); renderInventory();
 }
@@ -2210,9 +2788,219 @@ function deleteInv(id){
 function markSold(id){
   const it = DB.inventory.find(x=>x.id===id); if(!it) return;
   confirmAction(`Mark "${it.itemName}" as sold?`, ()=>{
-    it.status='sold'; logHistory('Inventory','Sold', it.itemName+' marked sold');
+    setInvStatus(id, 'sold', it.location, '', 'Marked sold directly from inventory');
     saveDB(); renderInventory(); toast('Marked as sold');
   });
+}
+
+/* ---- STOCK LOTS ---- */
+function renderInvLotsTab(wrap){
+  let html = `<div class="cardHead" style="margin-bottom:12px;"><div></div><button class="btn btn-primary" onclick="openLotForm()">+ Add Stock Lot</button></div>`;
+  html += `<div class="card"><table><tr><th>Lot No.</th><th>Metal</th><th>Purity</th><th>Total Wt</th><th>Remaining Wt</th><th>Source</th><th>Status</th><th></th></tr>`;
+  const lots = DB.stockLots.filter(l=>!l.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(lots.length===0) html += `<tr><td colspan="8"><div class="empty"><div class="big">📦</div>No stock lots recorded yet. A lot is a batch of metal (e.g. 500g silver bought together) you can track and draw items from.</div></td></tr>`;
+  lots.forEach(l=>{
+    html += `<tr><td>${l.lotNo}</td><td>${l.metalType}</td><td>${l.purity}%</td><td>${fmtWt(l.weight)}</td><td>${fmtWt(l.remainingWeight)}</td><td>${l.source||'-'}</td><td>${l.status}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('stock lot', ()=>openLotForm('${l.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteLot('${l.id}')">🗑</button></td></tr>`;
+  });
+  html += `</table></div>`;
+  wrap.innerHTML = html;
+}
+function openLotForm(id){
+  const l = id ? DB.stockLots.find(x=>x.id===id) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Lot Number</label><input id="lotNo" value="${l?l.lotNo:'LOT-'+(DB.stockLots.length+1001)}"></div>
+      <div class="field"><label>Metal Type</label><select id="lotMetal"><option ${l&&l.metalType==='Silver'?'selected':''}>Silver</option><option ${l&&l.metalType==='Gold'?'selected':''}>Gold</option><option ${l&&l.metalType==='Mixed'?'selected':''}>Mixed</option></select></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>Purity %</label><input type="number" id="lotPurity" value="${l?l.purity:100}"></div>
+      <div class="field"><label>Total Weight</label><input type="number" step="0.001" id="lotWeight" value="${l?l.weight:''}"></div>
+      <div class="field"><label>Remaining Weight</label><input type="number" step="0.001" id="lotRemaining" value="${l?l.remainingWeight:''}" placeholder="defaults to total weight"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Source</label><input id="lotSource" placeholder="Supplier / melted from old items / etc" value="${l?l.source||'':''}"></div>
+      <div class="field"><label>Cost</label><input type="number" id="lotCost" value="${l?l.cost||'':''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Status</label><select id="lotStatus"><option ${l&&l.status==='Active'?'selected':''}>Active</option><option ${l&&l.status==='Exhausted'?'selected':''}>Exhausted</option><option ${l&&l.status==='Closed'?'selected':''}>Closed</option></select></div>
+      <div class="field"><label>Date</label><input type="date" id="lotDate" value="${l?l.date:todayStr()}" max="${todayStr()}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="lotNotes" value="${l?l.notes||'':''}"></div>
+  `;
+  openModal(l?'Edit Stock Lot':'Add Stock Lot', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:l?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveLot(id)}
+  ]);
+}
+function saveLot(id){
+  const lotNo = document.getElementById('lotNo').value.trim();
+  if(!lotNo){ toast('Enter a lot number'); return; }
+  const weight = parseFloat(document.getElementById('lotWeight').value)||0;
+  const remaining = parseFloat(document.getElementById('lotRemaining').value);
+  const data = {
+    lotNo, metalType: document.getElementById('lotMetal').value, purity: parseFloat(document.getElementById('lotPurity').value)||100,
+    weight, remainingWeight: isNaN(remaining)?weight:remaining, source: document.getElementById('lotSource').value,
+    cost: parseFloat(document.getElementById('lotCost').value)||0, status: document.getElementById('lotStatus').value,
+    date: document.getElementById('lotDate').value||todayStr(), notes: document.getElementById('lotNotes').value
+  };
+  if(id){
+    const l = DB.stockLots.find(x=>x.id===id); if(!l) return;
+    Object.assign(l, data);
+    logHistory('StockLot','Edited', lotNo+' edited');
+    saveDB(); closeModal(); toast('Lot updated'); renderInvTabBody();
+    return;
+  }
+  DB.stockLots.push({id:uid('LOT'), createdAt:nowISO(), deleted:false, ...data});
+  logHistory('StockLot','Created', lotNo+' added — '+fmtWt(weight));
+  saveDB(); closeModal(); toast('Lot added'); renderInvTabBody();
+}
+function deleteLot(id){
+  const l = DB.stockLots.find(x=>x.id===id); if(!l) return;
+  guardDelete('stock lot ('+l.lotNo+')', ()=>{
+    l.deleted = true;
+    logHistory('StockLot','Deleted', l.lotNo+' deleted');
+    saveDB(); renderInvTabBody(); toast('Lot deleted');
+  });
+}
+
+/* ---- COMPONENTS & RAW MATERIALS ---- */
+function renderInvComponentsTab(wrap){
+  let html = `<div class="cardHead" style="margin-bottom:12px;"><div></div><button class="btn btn-primary" onclick="openComponentForm()">+ Add Component</button></div>`;
+  html += `<div class="card"><table><tr><th>Name</th><th>Category</th><th>Stock</th><th>Reorder At</th><th>Unit Cost</th><th>Supplier</th><th></th></tr>`;
+  const comps = DB.components.filter(c=>!c.deleted).sort((a,b)=>a.name.localeCompare(b.name));
+  if(comps.length===0) html += `<tr><td colspan="7"><div class="empty"><div class="big">🧵</div>No components tracked yet — wire, beads, findings, clasps, loose stones, etc.</div></td></tr>`;
+  comps.forEach(c=>{
+    const low = c.reorderLevel!=='' && Number(c.currentStock) <= Number(c.reorderLevel);
+    html += `<tr><td>${c.name}${low?' <span class="tag tag-red">Low Stock</span>':''}</td><td>${c.category||'-'}</td><td>${c.currentStock} ${c.unit}</td><td>${c.reorderLevel||'-'}</td><td>${c.cost?fmtMoney(c.cost):'-'}</td><td>${c.supplier||'-'}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="guardEdit('component', ()=>openComponentForm('${c.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteComponent('${c.id}')">🗑</button></td></tr>`;
+  });
+  html += `</table></div>`;
+  wrap.innerHTML = html;
+}
+function openComponentForm(id){
+  const c = id ? DB.components.find(x=>x.id===id) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Name</label><input id="compName" placeholder="e.g. Silver wire, beads, clasps" value="${c?c.name:''}"></div>
+      <div class="field"><label>Category</label><input id="compCategory" placeholder="wire / beads / stones / findings" value="${c?c.category||'':''}"></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>Current Stock</label><input type="number" step="0.001" id="compStock" value="${c?c.currentStock:''}"></div>
+      <div class="field"><label>Unit</label><input id="compUnit" placeholder="gram / piece / carat" value="${c?c.unit||'':''}"></div>
+      <div class="field"><label>Reorder Level</label><input type="number" id="compReorder" value="${c?c.reorderLevel:''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Unit Cost</label><input type="number" id="compCost" value="${c?c.cost||'':''}"></div>
+      <div class="field"><label>Supplier</label><input id="compSupplier" value="${c?c.supplier||'':''}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="compNotes" value="${c?c.notes||'':''}"></div>
+  `;
+  openModal(c?'Edit Component':'Add Component', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:c?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveComponent(id)}
+  ]);
+}
+function saveComponent(id){
+  const name = document.getElementById('compName').value.trim();
+  if(!name){ toast('Enter component name'); return; }
+  const data = {
+    name, category: document.getElementById('compCategory').value, currentStock: parseFloat(document.getElementById('compStock').value)||0,
+    unit: document.getElementById('compUnit').value, reorderLevel: document.getElementById('compReorder').value===''?'':parseFloat(document.getElementById('compReorder').value),
+    cost: parseFloat(document.getElementById('compCost').value)||0, supplier: document.getElementById('compSupplier').value,
+    notes: document.getElementById('compNotes').value
+  };
+  if(id){
+    const c = DB.components.find(x=>x.id===id); if(!c) return;
+    Object.assign(c, data);
+    logHistory('Component','Edited', name+' edited');
+    saveDB(); closeModal(); toast('Component updated'); renderInvTabBody();
+    return;
+  }
+  DB.components.push({id:uid('COMP'), createdAt:nowISO(), deleted:false, ...data});
+  logHistory('Component','Added', name+' added to component stock');
+  saveDB(); closeModal(); toast('Component added'); renderInvTabBody();
+}
+function deleteComponent(id){
+  const c = DB.components.find(x=>x.id===id); if(!c) return;
+  guardDelete('component ('+c.name+')', ()=>{
+    c.deleted = true;
+    logHistory('Component','Deleted', c.name+' deleted');
+    saveDB(); renderInvTabBody(); toast('Component deleted');
+  });
+}
+
+/* ---- MOVEMENT LEDGER ---- */
+function renderInvMovementsTab(wrap){
+  let html = `<div class="card"><div class="searchBar"><input id="movSearch" placeholder="Search by item code/type/reference..." oninput="renderMovTable()"></div><div id="movTableWrap"></div></div>`;
+  wrap.innerHTML = html;
+  renderMovTable();
+}
+function renderMovTable(){
+  const q = (document.getElementById('movSearch')?.value||'').toLowerCase();
+  let rows = [...DB.inventoryMovements].filter(m=>!m.deleted).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,300);
+  if(q) rows = rows.filter(m=>{
+    const item = DB.inventory.find(i=>i.id===m.itemId);
+    return [item?item.code:'', item?item.itemName:'', m.type, m.reference].filter(Boolean).some(v=>v.toLowerCase().includes(q));
+  });
+  let html = `<table><tr><th>Date</th><th>Item</th><th>Movement</th><th>From → To</th><th>Reference</th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="5"><div class="empty"><div class="big">🔄</div>No movements recorded yet.</div></td></tr>`;
+  rows.forEach(m=>{
+    const item = DB.inventory.find(i=>i.id===m.itemId);
+    html += `<tr><td>${fmtDate(m.date)}</td><td>${item?item.code+' — '+item.itemName:'(deleted item)'}</td><td>${m.type}</td><td>${m.fromLocation||'-'} → ${m.toLocation||'-'}</td><td>${m.reference||m.notes||'-'}</td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('movTableWrap').innerHTML = html;
+}
+
+/* ---- CODE 39 BARCODE + PRINT LABEL ---- */
+const CODE39_PATTERNS = {
+  '0':'NNNWWNWNN','1':'WNNWNNNNW','2':'NNWWNNNNW','3':'WNWWNNNNN','4':'NNNWWNNNW',
+  '5':'WNNWWNNNN','6':'NNWWWNNNN','7':'NNNWNNWNW','8':'WNNWNNWNN','9':'NNWWNNWNN',
+  'A':'WNNNNWNNW','B':'NNWNNWNNW','C':'WNWNNWNNN','D':'NNNNWWNNW','E':'WNNNWWNNN',
+  'F':'NNWNWWNNN','G':'NNNNNWWNW','H':'WNNNNWWNN','I':'NNWNNWWNN','J':'NNNNWWWNN',
+  'K':'WNNNNNNWW','L':'NNWNNNNWW','M':'WNWNNNNWN','N':'NNNNWNNWW','O':'WNNNWNNWN',
+  'P':'NNWNWNNWN','Q':'NNNNNNWWW','R':'WNNNNNWWN','S':'NNWNNNWWN','T':'NNNNWNWWN',
+  'U':'WWNNNNNNW','V':'NWWNNNNNW','W':'WWWNNNNNN','X':'NWNNWNNNW','Y':'WWNNWNNNN',
+  'Z':'NWWNWNNNN','-':'NWNNNNWNW','.':'WWNNNNNWN',' ':'NWWNNNWNN','$':'NWNWNWNNN',
+  '/':'NWNWNNNWN','+':'NWNNNWNWN','%':'NNNWNWNWN','*':'NWNNWNWNN'
+};
+function code39Compatible(text){ return /^[A-Z0-9 \-.$/+%]+$/.test(text); }
+function renderCode39SVG(text, height){
+  height = height||46;
+  const raw = String(text).toUpperCase();
+  const clean = code39Compatible(raw) ? raw : raw.replace(/[^A-Z0-9\-]/g,'');
+  const chars = '*'+clean+'*';
+  let x=0; const narrow=2, wide=5, gap=2; const bars=[];
+  for(const ch of chars){
+    const pattern = CODE39_PATTERNS[ch]; if(!pattern) continue;
+    for(let k=0;k<pattern.length;k++){
+      const isBar = k%2===0; const w = pattern[k]==='W'?wide:narrow;
+      if(isBar) bars.push(`<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`);
+      x += w;
+    }
+    x += gap;
+  }
+  return `<svg viewBox="0 0 ${x} ${height}" width="100%" height="${height}" style="max-width:320px;">${bars.join('')}</svg>`;
+}
+function printInvLabel(id){
+  const i = DB.inventory.find(x=>x.id===id); if(!i) return;
+  let area = document.getElementById('printArea');
+  if(!area){ area = document.createElement('div'); area.id='printArea'; document.body.appendChild(area); }
+  area.innerHTML = `
+    <div style="width:260px;margin:0 auto;border:1px solid #000;padding:10px;text-align:center;font-family:var(--font-body);color:#000;">
+      <div style="font-weight:bold;font-size:13px;">${DB.meta.shopName}</div>
+      <div style="font-size:11px;margin-top:2px;">${i.itemName}</div>
+      <div style="font-size:10px;">${i.category} • ${fmtWt(i.weight)} • ${i.purity}%${i.huid?' • HUID: '+i.huid:''}</div>
+      <div style="margin-top:6px;">${renderCode39SVG(i.code)}</div>
+      <div style="font-family:monospace;font-size:11px;letter-spacing:1px;margin-top:2px;">${i.code}</div>
+    </div>
+  `;
+  logHistory('Inventory','Label Printed', `Label printed for ${i.itemName} (${i.code})`);
+  saveDB();
+  setTimeout(()=>window.print(), 100);
 }
 
 /* =====================================================================
@@ -2411,7 +3199,7 @@ function renderLedgerList(){
   if(rows.length===0) html+=`<tr><td colspan="8"><div class="empty"><div class="big">👤</div>No customers found.</div></td></tr>`;
   rows.forEach(c=>{
     const bal=customerBalance(c.id);
-    html += `<tr><td>${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:32px;height:32px;">`:'<div class="photoPlaceholder" style="width:32px;height:32px;font-size:13px;">👤</div>'}</td>
+    html += `<tr><td>${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:32px;height:32px;cursor:pointer;" onclick="openFullPhoto('${c.photo}','${c.name}')">`:'<div class="photoPlaceholder" style="width:32px;height:32px;font-size:13px;">👤</div>'}</td>
     <td>${c.name}${c.tags?' <span class="tag tag-gold" style="margin-left:4px;">'+c.tags+'</span>':''}</td><td>${c.phone||'-'}</td><td>${c.village||'-'}</td><td>${bal>0?'<b style="color:var(--danger)">'+fmtMoney(bal)+'</b>':fmtMoney(bal)}</td>
     <td>${DB.sales.filter(s=>s.customerId===c.id && !s.deleted).length}</td><td>${DB.girvi.filter(g=>g.customerId===c.id && g.status==='active' && !g.deleted).length}</td>
     <td><button class="btn btn-sm btn-ghost" onclick="viewCustomerLedger('${c.id}')">View</button></td></tr>`;
@@ -2447,7 +3235,7 @@ function viewCustomerLedger(id){
 
   let body = `
     <div class="girviDetailHead" style="margin-bottom:14px;">
-      ${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:72px;height:72px;">`:`<div class="photoPlaceholder" style="width:72px;height:72px;font-size:26px;">👤</div>`}
+      ${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:72px;height:72px;cursor:pointer;" onclick="openFullPhoto('${c.photo}','${c.name}')">`:`<div class="photoPlaceholder" style="width:72px;height:72px;font-size:26px;">👤</div>`}
       <div>
         <div style="font-family:var(--font-display);font-size:19px;color:var(--maroon-dark);">${c.name} ${c.tags?'<span class="tag tag-gold">'+c.tags+'</span>':''}${isFrequent?' <span class="tag tag-green">Frequent</span>':''}${c.creditEnabled?' <span class="tag tag-gray">Credit A/C</span>':''}</div>
         <div class="helpText">${c.phone||'No phone on file'}${c.village?' • '+c.village:''}</div>
@@ -2536,7 +3324,10 @@ function openCreditEditForm(entryId, custId){
       <div class="field"><label>Entry Type</label><select id="ceType"><option value="debit" ${e.type==='debit'?'selected':''}>Udhaar Given (they owe more)</option><option value="credit" ${e.type==='credit'?'selected':''}>Payment Received (reduce due)</option></select></div>
       <div class="field"><label>Amount</label><input type="number" id="ceAmount" value="${e.amount}"></div>
     </div>
-    <div class="field" style="margin-top:12px;"><label>Date</label><input type="date" id="ceDate" value="${e.date}" max="${todayStr()}"></div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Date</label><input type="date" id="ceDate" value="${e.date}" max="${todayStr()}"></div>
+      <div class="field"><label>Due Date (optional)</label><input type="date" id="ceDueDate" value="${e.dueDate||''}"></div>
+    </div>
     <div class="field" style="margin-top:12px;"><label>Note</label><input id="ceDesc" value="${e.description||''}"></div>
   `;
   openModal('Edit Credit Entry', body, [
@@ -2545,6 +3336,7 @@ function openCreditEditForm(entryId, custId){
       e.type = document.getElementById('ceType').value;
       e.amount = parseFloat(document.getElementById('ceAmount').value)||0;
       e.date = document.getElementById('ceDate').value || e.date;
+      e.dueDate = document.getElementById('ceDueDate').value||'';
       e.description = document.getElementById('ceDesc').value;
       logHistory('Credit','Edited', `Credit entry edited for ${e.description} — ${fmtMoney(e.amount)}`);
       saveDB(); closeModal(); toast('Entry updated'); viewCustomerLedger(custId);
@@ -2613,7 +3405,7 @@ function renderReports(){
   }).filter(c=>c.total>0).sort((a,b)=>b.total-a.total).slice(0,5);
 
   // Inventory valuation at current rates
-  const stockItems = DB.inventory.filter(i=>i.status==='in-stock' && !i.deleted);
+  const stockItems = DB.inventory.filter(i=>invIsAvailable(i) && !i.deleted);
   let stockValue = 0, stockWtGold=0, stockWtSilver=0;
   stockItems.forEach(i=>{
     const purity = parseFloat(i.purity)||100;
@@ -2778,6 +3570,125 @@ function deleteExpense(id){
     e.deleted = true;
     logHistory('Expenses','Deleted', e.category+' entry of '+fmtMoney(e.amount)+' deleted');
     saveDB(); renderExpenses(); toast('Expense deleted');
+  });
+}
+
+/* =====================================================================
+   PAGE: TO-DO / PURCHASE LIST — quick reminders for things to buy or
+   bring to the shop (jewellery or otherwise). Simple, fast, tablet-friendly.
+===================================================================== */
+function renderTodo(){
+  window._todoFilter = window._todoFilter || 'pending';
+  const totalPending = DB.todos.filter(t=>!t.deleted && t.status==='pending').length;
+  let html = `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
+    <div class="statCard"><div class="lbl">Pending</div><div class="val">${totalPending}</div></div>
+    <div class="statCard" style="border-color:var(--success)"><div class="lbl">Bought</div><div class="val">${DB.todos.filter(t=>!t.deleted && t.status==='bought').length}</div></div>
+    <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Cancelled</div><div class="val">${DB.todos.filter(t=>!t.deleted && t.status==='cancelled').length}</div></div>
+  </div>`;
+  html += `<div class="cardHead" style="margin-bottom:12px;"><div></div><button class="btn btn-primary" onclick="openTodoForm()">+ Add To-Do</button></div>`;
+  html += `<div class="pillTabs">
+    ${['pending','bought','cancelled','all'].map(f=>`<div class="pillTab ${window._todoFilter===f?'active':''}" onclick="setTodoFilter(this,'${f}')">${f[0].toUpperCase()+f.slice(1)}</div>`).join('')}
+  </div>`;
+  html += `<div class="card"><div class="grid grid-2" style="margin-bottom:12px;">
+    <input id="todoSearch" placeholder="Search item / notes..." oninput="renderTodoTable()">
+    <select id="todoCategoryFilter" onchange="renderTodoTable()"><option value="">All Categories</option><option>Jewellery</option><option>Shop Item</option><option>Other</option></select>
+  </div><div id="todoTableWrap"></div></div>`;
+  document.getElementById('content').innerHTML = html;
+  renderTodoTable();
+}
+function setTodoFilter(el, f){
+  window._todoFilter = f;
+  document.querySelectorAll('#content .pillTab').forEach(p=>p.classList.remove('active')); el.classList.add('active');
+  renderTodoTable();
+}
+function renderTodoTable(){
+  const q = (document.getElementById('todoSearch')?.value||'').toLowerCase();
+  const catF = document.getElementById('todoCategoryFilter')?.value||'';
+  const f = window._todoFilter||'pending';
+  let rows = DB.todos.filter(t=>!t.deleted).sort((a,b)=>{
+    const pOrder = {High:0, Medium:1, Low:2, '':3};
+    return (pOrder[a.priority]??3) - (pOrder[b.priority]??3) || b.dateCreated.localeCompare(a.dateCreated);
+  });
+  if(f!=='all') rows = rows.filter(t=>t.status===f);
+  if(catF) rows = rows.filter(t=>t.category===catF);
+  if(q) rows = rows.filter(t=> [t.itemName,t.notes].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
+  let html = `<table><tr><th>Item</th><th>Category</th><th>Priority</th><th>Notes</th><th>Created</th><th>Status</th><th></th></tr>`;
+  if(rows.length===0) html += `<tr><td colspan="7"><div class="empty"><div class="big">📝</div>Nothing here yet.</div></td></tr>`;
+  rows.forEach(t=>{
+    const statusTag = t.status==='bought'?'tag-green':t.status==='cancelled'?'tag-gray':'tag-gold';
+    const prioTag = t.priority==='High'?'tag-red':t.priority==='Medium'?'tag-gold':'tag-gray';
+    html += `<tr><td>${t.itemName}</td><td>${t.category||'-'}</td><td>${t.priority?`<span class="tag ${prioTag}">${t.priority}</span>`:'-'}</td><td>${t.notes||'-'}</td><td>${fmtDate(t.dateCreated)}</td>
+    <td><span class="tag ${statusTag}">${t.status[0].toUpperCase()+t.status.slice(1)}</span></td>
+    <td>${t.status==='pending'?`<button class="btn btn-sm btn-outline" onclick="markTodoBought('${t.id}')">Mark Bought</button><button class="btn btn-sm btn-ghost" onclick="markTodoCancelled('${t.id}')">Cancel</button>`:''}
+    <button class="btn btn-sm btn-ghost" onclick="guardEdit('to-do item', ()=>openTodoForm('${t.id}'))">✎</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteTodo('${t.id}')">🗑</button></td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('todoTableWrap').innerHTML = html;
+}
+function openTodoForm(id){
+  const t = id ? DB.todos.find(x=>x.id===id) : null;
+  const body = `
+    <div class="grid grid-2">
+      <div class="field"><label>Item Name *</label><input id="todoName" value="${t?t.itemName:''}" placeholder="e.g. New display trays"></div>
+      <div class="field"><label>Category</label><select id="todoCategory">
+        <option ${t&&t.category==='Jewellery'?'selected':''}>Jewellery</option>
+        <option ${t&&t.category==='Shop Item'?'selected':''}>Shop Item</option>
+        <option ${!t||t.category==='Other'?'selected':''}>Other</option>
+      </select></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Priority</label><select id="todoPriority">
+        <option value="" ${t&&!t.priority?'selected':''}>-</option>
+        <option ${t&&t.priority==='High'?'selected':''}>High</option>
+        <option ${t&&t.priority==='Medium'?'selected':''}>Medium</option>
+        <option ${t&&t.priority==='Low'?'selected':''}>Low</option>
+      </select></div>
+      <div class="field"><label>Date</label><input type="date" id="todoDate" value="${t?t.dateCreated:todayStr()}" max="${todayStr()}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input id="todoNotes" value="${t?t.notes||'':''}"></div>
+  `;
+  openModal(t?'Edit To-Do':'New To-Do', body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:t?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveTodo(id)}
+  ]);
+}
+function saveTodo(id){
+  const name = document.getElementById('todoName').value.trim();
+  if(!name){ toast('Enter item name'); return; }
+  const data = {
+    itemName:name, category: document.getElementById('todoCategory').value, priority: document.getElementById('todoPriority').value,
+    notes: document.getElementById('todoNotes').value, dateCreated: document.getElementById('todoDate').value||todayStr()
+  };
+  if(id){
+    const t = DB.todos.find(x=>x.id===id); if(!t) return;
+    Object.assign(t, data);
+    logHistory('Todo','Edited', name+' edited');
+    saveDB(); closeModal(); toast('To-do updated'); renderTodo();
+    return;
+  }
+  DB.todos.push({id:uid('TODO'), status:'pending', dateCompleted:null, linkedInventoryId:null, createdAt:nowISO(), deleted:false, ...data});
+  logHistory('Todo','Added', name+' added to to-do list');
+  saveDB(); closeModal(); toast('Added to list'); renderTodo();
+}
+function markTodoBought(id){
+  const t = DB.todos.find(x=>x.id===id); if(!t) return;
+  t.status='bought'; t.dateCompleted=todayStr();
+  logHistory('Todo','Bought', t.itemName+' marked bought');
+  saveDB(); renderTodo(); toast('Marked bought ✓');
+}
+function markTodoCancelled(id){
+  const t = DB.todos.find(x=>x.id===id); if(!t) return;
+  t.status='cancelled'; t.dateCompleted=todayStr();
+  logHistory('Todo','Cancelled', t.itemName+' cancelled');
+  saveDB(); renderTodo(); toast('Cancelled');
+}
+function deleteTodo(id){
+  const t = DB.todos.find(x=>x.id===id); if(!t) return;
+  guardDelete('to-do item ('+t.itemName+')', ()=>{
+    t.deleted = true;
+    logHistory('Todo','Deleted', t.itemName+' deleted');
+    saveDB(); renderTodo(); toast('Deleted');
   });
 }
 
@@ -3372,6 +4283,7 @@ const PAGES = {
   credit: renderCredit, inventory: renderInventory, jobs: renderJobs, exchange: renderExchange,
   ledger: renderLedger, history: renderHistory, reports: renderReports, settings: renderSettings,
   cashday: renderCashday, expenses: renderExpenses, wholesaler: renderWholesaler, calculator: renderCalculator,
+  todo: renderTodo,
 };
 function updateClock(){
   const el = document.getElementById('topDateTime'); if(!el) return;
