@@ -233,6 +233,13 @@ tr:hover td{background:#FBF8F1;}
 
 /* ---- Global search modal ---- */
 .searchResultGroup{margin-bottom:14px;}
+/* ---- Customer memory autocomplete ---- */
+.custSuggestList{display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:1px solid var(--gold-light);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;margin-top:2px;}
+.custSuggestList.active{display:block;}
+.custSuggestRow{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);}
+.custSuggestRow:last-child{border-bottom:none;}
+.custSuggestRow:hover{background:var(--bg);}
+.draftBadge{background:#EDEAE2;color:var(--ink-soft);border:1px dashed var(--ink-soft);padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:700;}
 .searchResultGroup h5{font-family:var(--font-display);color:var(--maroon-dark);margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;}
 .searchResultRow{display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;}
 .searchResultRow:hover{background:var(--bg);}
@@ -395,8 +402,15 @@ function migrateDB(d){
     if(g.linkedBuyingId===undefined) g.linkedBuyingId=null;
     if(g.forwards===undefined) g.forwards=[];
     if(g.notes===undefined) g.notes='';
+    if(g.isDraft===undefined) g.isDraft=false;
   });
-  (d.sales||[]).forEach(s=>{ (s.items||[]).forEach(i=>{ if(i.purity===undefined || i.purity==='') i.purity=100; if(i.stoneWeight===undefined) i.stoneWeight=0; }); });
+  (d.sales||[]).forEach(s=>{ (s.items||[]).forEach(i=>{
+    if(i.purity===undefined || i.purity==='') i.purity=100;
+    if(i.stoneWeight===undefined) i.stoneWeight=0;
+    if(i.itemType===undefined) i.itemType='metal';
+    if(i.qty===undefined) i.qty=1;
+    if(i.pricePerPiece===undefined) i.pricePerPiece=0;
+  }); });
   (d.buying||[]).forEach(b=>{ if(b.purity===undefined || b.purity==='') b.purity=100; if(b.linkedGirviId===undefined) b.linkedGirviId=null; if(b.notes===undefined) b.notes=''; });
   (d.customers||[]).forEach(c=>{
     if(c.photo===undefined) c.photo=null;
@@ -410,6 +424,8 @@ function migrateDB(d){
       // stays visible in Credit — opt-in only applies going forward.
       c.creditEnabled = (d.creditEntries||[]).some(e=>e.customerId===c.id && !e.deleted);
     }
+    if(c.mergedInto===undefined) c.mergedInto=null;
+    if(!Array.isArray(c.photos)) c.photos = c.photo ? [c.photo] : [];
   });
   (d.creditEntries||[]).forEach(e=>{ if(e.dueDate===undefined) e.dueDate=''; });
   (d.inventory||[]).forEach(i=>{
@@ -660,6 +676,73 @@ function customerBalance(customerId){
 function customerOptionsHTML(){
   return DB.customers.map(c=>`<option value="${c.id}">${c.name}${c.phone?' — '+c.phone:''}</option>`).join('');
 }
+/* ---------------------- CUSTOMER MEMORY: live autocomplete ----------------------
+   Attaches a floating suggestion list under a name input. As the shop owner
+   types, matching existing customers (by name OR phone, partial match) show
+   up with a photo thumbnail so staff can recognize and reuse the same
+   customer record instead of accidentally creating a duplicate. Selecting a
+   suggestion fills the name (and phone, if a phone field id is given) and
+   remembers which customer was picked so save functions can reuse the exact
+   same customerId instead of re-matching by name text. */
+window._pickedCustomerId = {};
+function attachCustomerAutocomplete(nameInputId, phoneInputId){
+  const input = document.getElementById(nameInputId);
+  if(!input || input._autocompleteAttached) return;
+  input._autocompleteAttached = true;
+  const listId = nameInputId+'_suggest';
+  let list = document.getElementById(listId);
+  if(!list){
+    list = document.createElement('div');
+    list.id = listId;
+    list.className = 'custSuggestList';
+    input.parentNode.style.position = 'relative';
+    input.parentNode.appendChild(list);
+  }
+  const render = ()=>{
+    const q = input.value.trim().toLowerCase();
+    window._pickedCustomerId[nameInputId] = null;
+    if(q.length<1){ list.innerHTML=''; list.classList.remove('active'); return; }
+    const matches = DB.customers.filter(c=>!c.mergedInto && (c.name.toLowerCase().includes(q) || (c.phone||'').includes(q))).slice(0,6);
+    if(matches.length===0){ list.innerHTML=''; list.classList.remove('active'); return; }
+    list.innerHTML = matches.map(c=>`<div class="custSuggestRow" data-cid="${c.id}">
+        ${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:28px;height:28px;">`:`<div class="photoPlaceholder" style="width:28px;height:28px;font-size:12px;">👤</div>`}
+        <span>${c.name}${c.phone?' — '+c.phone:''}${c.village?' <span class="helpText">('+c.village+')</span>':''}</span>
+      </div>`).join('');
+    list.classList.add('active');
+    list.querySelectorAll('.custSuggestRow').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        const c = DB.customers.find(x=>x.id===row.dataset.cid); if(!c) return;
+        input.value = c.name;
+        if(phoneInputId && document.getElementById(phoneInputId)) document.getElementById(phoneInputId).value = c.phone||'';
+        window._pickedCustomerId[nameInputId] = c.id;
+        list.innerHTML=''; list.classList.remove('active');
+        toast('Using existing customer: '+c.name);
+      });
+    });
+  };
+  input.addEventListener('input', render);
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', ()=>{ setTimeout(()=>{ list.classList.remove('active'); }, 200); });
+}
+/* Like findOrCreateCustomer, but customer-memory-aware: if the person was
+   picked from the autocomplete suggestion list, reuse that exact record
+   (even if they then tweak the phone) instead of re-matching by text, so
+   memory stays consistent. Falls back to the normal exact-match/create
+   behaviour otherwise — fully backward compatible. */
+function resolveCustomer(nameInputId, phoneInputId){
+  const pickedId = window._pickedCustomerId && window._pickedCustomerId[nameInputId];
+  const name = document.getElementById(nameInputId).value.trim();
+  const phone = phoneInputId ? document.getElementById(phoneInputId).value.trim() : '';
+  if(pickedId){
+    const c = DB.customers.find(x=>x.id===pickedId && !x.mergedInto);
+    if(c){
+      if(name && name!==c.name) c.name = name;
+      if(phone && phone!==c.phone) c.phone = phone;
+      return c;
+    }
+  }
+  return findOrCreateCustomer(name, phone);
+}
 
 /* =====================================================================
    PAGE: DASHBOARD
@@ -875,20 +958,54 @@ function openSaleForm(editId){
   ]);
   if(!existing) addSaleItemRow(); else renderSaleItemRows();
   recalcSaleTotals();
+  attachCustomerAutocomplete('saleCustomer','salePhone');
 }
 function addSaleItemRow(){
-  saleDraftItems.push({itemName:'', category:'Silver', weight:0, purity:100, rate:0, making:0, itemDiscount:0});
+  saleDraftItems.push({itemType:'metal', itemName:'', category:'Silver', weight:0, purity:100, rate:0, making:0, itemDiscount:0, qty:1, pricePerPiece:0, itemNotes:''});
   renderSaleItemRows();
 }
 function removeSaleItemRow(i){ saleDraftItems.splice(i,1); renderSaleItemRows(); recalcSaleTotals(); }
+function saleItemAmount(it){
+  if(it.itemType==='custom_rupee'){
+    return (Number(it.qty)||0) * (Number(it.pricePerPiece)||0);
+  }
+  const purity = (it.purity===undefined||it.purity==='') ? 100 : Number(it.purity);
+  const pw = (Number(it.weight)||0) * (purity/100);
+  return (pw*(Number(it.rate)||0)) + Number(it.making||0);
+}
+function setSaleItemType(i, type){
+  saleDraftItems[i].itemType = type;
+  renderSaleItemRows(); recalcSaleTotals();
+}
 function renderSaleItemRows(){
   const wrap = document.getElementById('saleItemsWrap');
   wrap.innerHTML = saleDraftItems.map((it,i)=>{
+    if(it.itemType==='custom_rupee'){
+      const amt = saleItemAmount(it);
+      return `
+      <div class="itemRow" style="grid-template-columns:0.9fr 1.3fr 0.6fr 0.8fr 0.9fr 1fr auto;">
+        <div class="field"><label>Item Type</label><select onchange="setSaleItemType(${i}, this.value)">
+          <option value="metal">Metal Item</option>
+          <option value="custom_rupee" selected>Custom Rupee Item</option>
+        </select></div>
+        <div class="field"><label>Item Name</label><input value="${it.itemName}" placeholder="e.g. Rudraksh, Stone" oninput="saleDraftItems[${i}].itemName=this.value"></div>
+        <div class="field"><label>Qty</label><input type="number" value="${it.qty||1}" oninput="saleDraftItems[${i}].qty=parseFloat(this.value)||0; recalcSaleTotals();"></div>
+        <div class="field"><label>Price/Piece (₹)</label><input type="number" value="${it.pricePerPiece||0}" oninput="saleDraftItems[${i}].pricePerPiece=parseFloat(this.value)||0; recalcSaleTotals();"></div>
+        <div class="field"><label>Notes</label><input value="${it.itemNotes||''}" placeholder="Optional" oninput="saleDraftItems[${i}].itemNotes=this.value"></div>
+        <div class="field"><label>Amount</label><input value="${fmtMoney(amt)}" disabled style="background:var(--bg);color:var(--ink-soft);"></div>
+        <button class="miniRemove" onclick="removeSaleItemRow(${i})">✕</button>
+      </div>
+    `;
+    }
     const purity = (it.purity===undefined||it.purity==='')?100:it.purity;
     const pureWt = (Number(it.weight)||0) * (Number(purity)||0)/100;
     const linkedItem = it.linkedInventoryId ? DB.inventory.find(x=>x.id===it.linkedInventoryId) : null;
     return `
-    <div class="itemRow" style="grid-template-columns:1.2fr 0.85fr 0.7fr 0.75fr 0.8fr 0.75fr 0.8fr 0.85fr auto;">
+    <div class="itemRow" style="grid-template-columns:0.75fr 1.05fr 0.8fr 0.65fr 0.7fr 0.75fr 0.65fr 0.75fr 0.8fr auto;">
+      <div class="field"><label>Item Type</label><select onchange="setSaleItemType(${i}, this.value)">
+        <option value="metal" selected>Metal Item</option>
+        <option value="custom_rupee">Custom Rupee Item</option>
+      </select></div>
       <div class="field"><label>Item</label><input value="${it.itemName}" placeholder="e.g. Silver Payal" oninput="saleDraftItems[${i}].itemName=this.value">
         <button class="btn btn-sm btn-ghost" style="margin-top:3px;padding:2px 6px;font-size:10px;" onclick="pickInventoryForSaleItem(${i})">🔗 ${linkedItem?'Linked: '+linkedItem.code:'Link Stock'}</button></div>
       <div class="field"><label>${T('category')}</label>
@@ -930,14 +1047,14 @@ function linkInventoryToSaleItem(rowIndex, invId){
   const item = DB.inventory.find(x=>x.id===invId); if(!item) return;
   const purity = parseFloat(item.purity);
   saleDraftItems[rowIndex] = {
-    ...saleDraftItems[rowIndex],
+    ...saleDraftItems[rowIndex], itemType:'metal',
     itemName: item.itemName, category: item.category==='Other'?'Custom':item.category,
     weight: item.weight, purity: isNaN(purity)?100:purity, linkedInventoryId: item.id
   };
   closeModal(); renderSaleItemRows(); recalcSaleTotals(); toast('Linked to '+item.code);
 }
 function autoFillRate(i){
-  const it = saleDraftItems[i]; if(!it) return;
+  const it = saleDraftItems[i]; if(!it || it.itemType==='custom_rupee') return;
   if(it.rate) return;
   if(it.category==='Gold') it.rate = DB.currentRates.gold22/10;
   else if(it.category!=='Custom') it.rate = DB.currentRates.silverKg/1000;
@@ -945,10 +1062,14 @@ function autoFillRate(i){
 function recalcSaleTotals(){
   let sub=0, wt=0, pureWt=0;
   saleDraftItems.forEach(it=>{
+    if(it.itemType==='custom_rupee'){
+      sub += saleItemAmount(it);
+      return;
+    }
     const purity = (it.purity===undefined||it.purity==='') ? 100 : Number(it.purity);
     const pw = (Number(it.weight)||0) * (purity/100);
     pureWt += pw; wt += Number(it.weight||0);
-    sub += (pw*(it.rate||0)) + Number(it.making||0);
+    sub += saleItemAmount(it);
   });
   const discount = parseFloat(document.getElementById('saleDiscount')?.value)||0;
   const grand = Math.max(sub-discount,0);
@@ -975,11 +1096,11 @@ function saveSale(){
   const payMode = document.getElementById('salePayMode').value;
   const saleDate = document.getElementById('saleDate').value || todayStr();
   const manualPaid = document.getElementById('saleAmountPaid').value;
-  let sub=0; saleDraftItems.forEach(it=>{ const purity=(it.purity===undefined||it.purity==='')?100:Number(it.purity); const pw=(it.weight||0)*(purity/100); sub += (pw*(it.rate||0))+Number(it.making||0); });
+  let sub=0; saleDraftItems.forEach(it=>{ sub += saleItemAmount(it); });
   const pct = sub>0 ? (discount/sub*100):0;
 
   const finalize = ()=>{
-    const cust = findOrCreateCustomer(custName, phone);
+    const cust = resolveCustomer('saleCustomer','salePhone');
     const grand = Math.max(sub-discount,0);
     const amountPaid = manualPaid!=='' ? (parseFloat(manualPaid)||0) : ((payMode==='Full Credit') ? 0 : grand);
     const cleanItems = saleDraftItems.filter(i=>i.itemName).map(i=>({...i, purity:(i.purity===undefined||i.purity==='')?100:Number(i.purity)}));
@@ -1044,7 +1165,14 @@ function viewSale(id){
     <div><b>Customer:</b> ${s.customerName}</div><div><b>Payment:</b> ${s.paymentMode}</div>
   </div>
   <table><tr><th>Item</th><th>Category</th><th>Wt</th><th>Purity</th><th>Pure Wt</th><th>Rate</th><th>Making</th><th>Amount</th></tr>
-  ${s.items.map(i=>{ const purity=(i.purity===undefined||i.purity==='')?100:i.purity; const pw=(i.weight||0)*(purity/100); const amt=pw*(i.rate||0)+Number(i.making||0); return `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${fmtWt(i.weight)}</td><td>${purity}%</td><td>${fmtWt(pw)}</td><td>${fmtMoney(i.rate)}</td><td>${fmtMoney(i.making)}</td><td>${fmtMoney(amt)}</td></tr>`; }).join('')}
+  ${s.items.map(i=>{
+    if(i.itemType==='custom_rupee'){
+      const amt = saleItemAmount(i);
+      return `<tr><td>${i.itemName}${i.itemNotes?' <span class="helpText">('+i.itemNotes+')</span>':''}</td><td>Custom Item</td><td>-</td><td>-</td><td>-</td><td>Qty ${i.qty} × ${fmtMoney(i.pricePerPiece)}</td><td>-</td><td>${fmtMoney(amt)}</td></tr>`;
+    }
+    const purity=(i.purity===undefined||i.purity==='')?100:i.purity; const pw=(i.weight||0)*(purity/100); const amt=pw*(i.rate||0)+Number(i.making||0);
+    return `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${fmtWt(i.weight)}</td><td>${purity}%</td><td>${fmtWt(pw)}</td><td>${fmtMoney(i.rate)}</td><td>${fmtMoney(i.making)}</td><td>${fmtMoney(amt)}</td></tr>`;
+  }).join('')}
   </table>
   <div class="totalsBox">
     <div class="totalsRow"><span>Subtotal</span><span>${fmtMoney(s.subTotal)}</span></div>
@@ -1111,6 +1239,9 @@ function buildBillHTML(s, layout){
   const m = DB.meta;
   const cust = DB.customers.find(c=>c.id===s.customerId) || {};
   const rows = s.items.map(i=>{
+    if(i.itemType==='custom_rupee'){
+      return {name:i.itemName, isCustom:true, qty:i.qty, pricePerPiece:i.pricePerPiece, itemNotes:i.itemNotes, amt: saleItemAmount(i)};
+    }
     const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
     const pw=(i.weight||0)*(purity/100);
     const stoneWt = Number(i.stoneWeight||0);
@@ -1134,8 +1265,8 @@ function buildBillHTML(s, layout){
         <div>${s.customerName}${cust.phone?' — '+cust.phone:''}</div>
       </div>
       ${rows.map(r=>`<div style="margin-bottom:4px;">
-        <div><b>${r.name}</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:10.5px;"><span>${r.weight}g @ ${r.purity}% × ${r.rate}${r.making?' +'+r.making+' mkg':''}</span><span>${fmtMoney(r.amt)}</span></div>
+        <div><b>${r.name}</b>${r.isCustom?' <span style="font-size:9px;">(Custom Item)</span>':''}</div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;"><span>${r.isCustom ? ('Qty '+r.qty+' × '+fmtMoney(r.pricePerPiece)) : (r.weight+'g @ '+r.purity+'% × '+r.rate+(r.making?' +'+r.making+' mkg':''))}</span><span>${fmtMoney(r.amt)}</span></div>
       </div>`).join('')}
       <div style="border-top:1px dashed #000;margin-top:6px;padding-top:5px;">
         <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>${fmtMoney(s.subTotal)}</span></div>
@@ -1173,7 +1304,12 @@ function buildBillHTML(s, layout){
             <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Making</th>
             <th style="text-align:right;padding:8px 6px;border-bottom:2px solid #AD8A3B;">Amount</th>
           </tr>
-          ${rows.map((r,idx)=>`<tr style="background:${idx%2?'#FBF8F1':'#fff'};">
+          ${rows.map((r,idx)=> r.isCustom ? `<tr style="background:${idx%2?'#FBF8F1':'#fff'};">
+            <td style="padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.name} <span style="font-size:10px;color:#6B5F55;">(Custom Item)</span>${r.itemNotes?`<div style="font-size:10px;color:#6B5F55;">${r.itemNotes}</div>`:''}</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;" colspan="3">Qty ${r.qty} × ${fmtMoney(r.pricePerPiece)}</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">-</td>
+            <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;font-weight:600;">${fmtMoney(r.amt)}</td>
+          </tr>` : `<tr style="background:${idx%2?'#FBF8F1':'#fff'};">
             <td style="padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.name}${r.stoneWt?`<div style="font-size:10px;color:#6B5F55;">(stone deduction: ${r.stoneWt}g)</div>`:''}</td>
             <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.weight}g</td>
             <td style="text-align:right;padding:7px 6px;border-bottom:1px solid #EEE6D3;">${r.purity}%</td>
@@ -1327,6 +1463,9 @@ function buildStyledSaleBillPdf(s){
   const B = PDF_BRAND;
   const pageW=595, marginX=40, contentW=pageW-marginX*2;
   const rows = s.items.map(i=>{
+    if(i.itemType==='custom_rupee'){
+      return {name:i.itemName+' (Custom Item)', isCustom:true, qty:i.qty, pricePerPiece:i.pricePerPiece, amt: saleItemAmount(i)};
+    }
     const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
     const pw=(i.weight||0)*(purity/100);
     const amt=pw*(i.rate||0)+Number(i.making||0);
@@ -1371,11 +1510,16 @@ function buildStyledSaleBillPdf(s){
     const rowH = 20;
     if(idx%2===1) pb.rect(marginX, y-rowH, contentW, rowH, '#FBF8F1');
     pb.text(cols.item, y-14, r.name, {size:10, colorHex:B.ink});
-    pb.text(cols.wt, y-14, r.weight+'g', {size:9.5, colorHex:B.ink, align:'right'});
-    pb.text(cols.purity, y-14, r.purity+'%', {size:9.5, colorHex:B.ink, align:'right'});
-    pb.text(cols.rate, y-14, fmtMoney(r.rate), {size:9.5, colorHex:B.ink, align:'right'});
-    pb.text(cols.making, y-14, fmtMoney(r.making), {size:9.5, colorHex:B.ink, align:'right'});
-    pb.text(cols.amt, y-14, fmtMoney(r.amt), {size:9.5, bold:true, colorHex:B.ink, align:'right'});
+    if(r.isCustom){
+      pb.text(cols.rate, y-14, 'Qty '+r.qty+' × '+fmtMoney(r.pricePerPiece), {size:9, colorHex:B.ink, align:'right'});
+      pb.text(cols.amt, y-14, fmtMoney(r.amt), {size:9.5, bold:true, colorHex:B.ink, align:'right'});
+    } else {
+      pb.text(cols.wt, y-14, r.weight+'g', {size:9.5, colorHex:B.ink, align:'right'});
+      pb.text(cols.purity, y-14, r.purity+'%', {size:9.5, colorHex:B.ink, align:'right'});
+      pb.text(cols.rate, y-14, fmtMoney(r.rate), {size:9.5, colorHex:B.ink, align:'right'});
+      pb.text(cols.making, y-14, fmtMoney(r.making), {size:9.5, colorHex:B.ink, align:'right'});
+      pb.text(cols.amt, y-14, fmtMoney(r.amt), {size:9.5, bold:true, colorHex:B.ink, align:'right'});
+    }
     y -= rowH;
   });
   y -= 12;
@@ -1649,6 +1793,10 @@ function buildBillText(s){
   lines.push('');
   lines.push('Items:');
   s.items.forEach(i=>{
+    if(i.itemType==='custom_rupee'){
+      lines.push(`• ${i.itemName} (Custom Item) — Qty ${i.qty} × ${fmtMoney(i.pricePerPiece)} — ${fmtMoney(saleItemAmount(i))}`);
+      return;
+    }
     const purity=(i.purity===undefined||i.purity==='')?100:i.purity;
     const pw=(i.weight||0)*(purity/100);
     const amt=pw*(i.rate||0)+Number(i.making||0);
@@ -1762,6 +1910,7 @@ function openBuyForm(id){
     {label:id?'Save Changes':T('save'), cls:'btn-primary', onClick:saveBuy}
   ]);
   if(!b) buyAutoRate(); else buyRecalc();
+  attachCustomerAutocomplete('buyCustomer','buyPhone');
 }
 function buyAutoRate(){
   const metal = document.getElementById('buyMetal').value;
@@ -1780,7 +1929,7 @@ function buyRecalc(){
 function saveBuy(){
   const name = document.getElementById('buyCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
-  const cust = findOrCreateCustomer(name, document.getElementById('buyPhone').value.trim());
+  const cust = resolveCustomer('buyCustomer','buyPhone');
   const weight = parseFloat(document.getElementById('buyWeight').value)||0;
   const purityRaw = parseFloat(document.getElementById('buyPurity').value);
   const purity = (purityRaw===undefined||isNaN(purityRaw)) ? 100 : purityRaw;
@@ -1813,14 +1962,34 @@ function saveBuy(){
 ===================================================================== */
 let grPhotoData = null;
 function renderGirvi(){
+  const active = DB.girvi.filter(g=>!g.deleted && g.status==='active');
+  const drafts = DB.girvi.filter(g=>!g.deleted && g.status==='draft');
+  const totalOut = active.reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0);
+  const overdue = active.filter(g=>g.dueDate && g.dueDate<todayStr()).length;
   let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><button class="btn btn-primary" onclick="openGirviForm()">+ ${T('newGirvi')}</button></div>`;
-  html += `<div class="card"><div class="searchBar"><input id="girviSearch" placeholder="Search by name, phone, or reference..." oninput="renderGirviTable()"></div><div id="girviTableWrap"></div></div>`;
+  html += `<div class="statGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+    <div class="statCard"><div class="lbl">Active Loans</div><div class="val">${active.length}</div></div>
+    <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Total Outstanding</div><div class="val" style="font-size:19px;">${fmtMoney(totalOut)}</div></div>
+    <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Overdue</div><div class="val">${overdue}</div></div>
+    <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Draft Entries</div><div class="val">${drafts.length}</div></div>
+  </div>`;
+  html += `<div class="card"><div class="searchBar"><input id="girviSearch" placeholder="🔍 Search by name, phone, or reference..." oninput="renderGirviTable()"></div><div id="girviTableWrap"></div></div>`;
   document.getElementById('content').innerHTML = html;
   renderGirviTable();
 }
 function girviInterestDue(g){
   const months = daysBetween(g.lastInterestDate||g.date) / 30;
   return Math.round((g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount) * (g.interestRatePct/100) * months);
+}
+function girviStatusTag(g){
+  if(g.status==='draft') return '<span class="tag tag-gray">📋 Draft — Pending Details</span>';
+  if(g.status==='redeemed') return '<span class="tag tag-green">✅ Redeemed</span>';
+  if(g.status==='forfeited') return '<span class="tag tag-gray">⚖️ Forfeited</span>';
+  if(g.status==='active'){
+    if(g.dueDate && g.dueDate<todayStr()) return '<span class="tag tag-red">⚠️ Overdue</span>';
+    return '<span class="tag tag-gold">🔐 Active</span>';
+  }
+  return `<span class="tag tag-gray">${g.status}</span>`;
 }
 function renderGirviTable(){
   const q = (document.getElementById('girviSearch')?.value||'').toLowerCase();
@@ -1830,17 +1999,25 @@ function renderGirviTable(){
     return g.customerName.toLowerCase().includes(q) || (cust&&cust.phone&&cust.phone.includes(q)) ||
       (g.referenceName||'').toLowerCase().includes(q) || (g.itemDesc||'').toLowerCase().includes(q);
   });
-  let html = `<table><tr><th>Date</th><th>Days at Shop</th><th>Customer</th><th>Item</th><th>Wt</th><th>Principal Due</th><th>Interest/mo</th><th>Status</th><th></th></tr>`;
+  let html = `<table><tr><th>Customer</th><th>Item</th><th>Wt</th><th>Loan Date</th><th>Days at Shop</th><th>Principal Due</th><th>Interest/mo</th><th>Status</th><th></th></tr>`;
   if(rows.length===0) html += `<tr><td colspan="9"><div class="empty"><div class="big">🔐</div>${q?'No matching customer found.':'No girvi loans yet.'}</div></td></tr>`;
   rows.forEach(g=>{
     const days = daysBetween(g.date);
     const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
-    const tag = g.status==='active' ? (g.dueDate && g.dueDate<todayStr()?'<span class="tag tag-red">Overdue</span>':'<span class="tag tag-gold">Active</span>')
-      : g.status==='redeemed' ? '<span class="tag tag-green">Redeemed</span>' : '<span class="tag tag-gray">Forfeited</span>';
-    html += `<tr><td>${fmtDate(g.date)}</td><td><span class="agingTag ${days>60&&g.status==='active'?'late':''}">${days} din</span></td>
-      <td style="display:flex;align-items:center;gap:6px;">${g.photo?`<img src="${g.photo}" class="photoThumb" style="width:26px;height:26px;cursor:pointer;" onclick="openFullPhoto('${g.photo}','${g.customerName}')">`:''}${g.customerName}</td>
-      <td>${g.itemDesc}</td><td>${fmtWt(g.weight)}</td><td>${fmtMoney(principal)}</td><td>${g.interestRatePct}%</td><td>${tag}</td>
-      <td><button class="btn btn-sm btn-outline" onclick="viewGirvi('${g.id}')">Manage</button></td></tr>`;
+    const isDraft = g.status==='draft';
+    html += `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px;">${g.photo?`<img src="${g.photo}" class="photoThumb" style="width:32px;height:32px;cursor:pointer;flex-shrink:0;" onclick="openFullPhoto('${g.photo}','${g.customerName}')">`:`<div class="photoPlaceholder" style="width:32px;height:32px;font-size:13px;flex-shrink:0;">👤</div>`}<div><div style="font-weight:600;">${g.customerName}</div>${g.referenceName?`<div class="helpText">via ${g.referenceName}</div>`:''}</div></div></td>
+      <td>${g.itemDesc || '<span class="helpText">— pending —</span>'}</td>
+      <td>${isDraft && !g.weight ? '-' : fmtWt(g.weight)}</td>
+      <td>${fmtDate(g.date)}</td>
+      <td><span class="agingTag ${days>60 && g.status==='active'?'late':''}">${days} din</span></td>
+      <td>${isDraft && !g.loanAmount ? '-' : fmtMoney(principal)}</td>
+      <td>${isDraft ? '-' : g.interestRatePct+'%'}</td>
+      <td>${girviStatusTag(g)}</td>
+      <td>${isDraft
+        ? `<button class="btn btn-sm btn-gold" onclick="openGirviCompleteForm('${g.id}')">Complete Entry</button>`
+        : `<button class="btn btn-sm btn-outline" onclick="viewGirvi('${g.id}')">Manage</button>`}</td>
+    </tr>`;
   });
   html += `</table>`;
   document.getElementById('girviTableWrap').innerHTML = html;
@@ -1853,34 +2030,43 @@ function openGirviForm(){
       <datalist id="custList3">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
       <div class="field"><label>${T('phone')}</label><input id="grPhone"></div>
     </div>
-    <div class="grid grid-3" style="margin-top:12px;">
-      <div class="field"><label>Item Description</label><input id="grItem" placeholder="Silver Chain 45g"></div>
-      <div class="field"><label>${T('metal')}</label><select id="grMetal"><option>Silver</option><option>Gold</option></select></div>
-      <div class="field"><label>${T('purity')} %</label><input type="number" id="grPurity" value="100"></div>
-    </div>
-    <div class="grid grid-3" style="margin-top:12px;">
-      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="grWeight"></div>
-      <div class="field"><label>Loan Amount</label><input type="number" id="grLoanAmt"></div>
-      <div class="field"><label>Interest %/month</label><input type="number" id="grInterest" value="2"></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Loan Date <span class="helpText">(back-date allowed)</span></label><input type="date" id="grDate" value="${todayStr()}" max="${todayStr()}"></div>
-      <div class="field"><label>Due Date (optional)</label><input type="date" id="grDue"></div>
-    </div>
-    <div class="field" style="margin-top:12px;"><label>Reference</label><input id="grRefName" placeholder="Name of the person who referred this customer"></div>
     <div class="field" style="margin-top:12px;">
       <label>Customer Photo</label>
-      <div style="display:flex;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <div id="grPhotoPreview" class="photoPlaceholder">📷</div>
-        <input type="file" accept="image/*" capture="environment" id="grPhotoInput" onchange="handleGirviPhoto(event)">
+        <label class="btn btn-sm btn-outline" style="margin:0;cursor:pointer;">📷 Camera<input type="file" accept="image/*" capture="environment" id="grPhotoInputCam" style="display:none;" onchange="handleGirviPhoto(event)"></label>
+        <label class="btn btn-sm btn-outline" style="margin:0;cursor:pointer;">🖼 Gallery<input type="file" accept="image/*" id="grPhotoInputGal" style="display:none;" onchange="handleGirviPhoto(event)"></label>
       </div>
-      <div class="helpText">Take a photo of the customer at the time of girvi — helps identify them later.</div>
+      <div class="helpText">Take or choose a photo of the customer — helps identify them later. This photo also becomes their profile photo, visible in the customer ledger.</div>
+    </div>
+    <div class="approveBox" style="margin-top:12px;background:var(--gold-pale);border-color:var(--gold-light);">
+      📋 In a hurry? Tap <b>Save as Draft</b> below to save just the name/photo now — you can fill in the item, weight, and loan amount later when you have time.
+    </div>
+    <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+      <p class="helpText" style="margin-top:0;">Full girvi details (can be filled now, or later if saved as draft)</p>
+      <div class="grid grid-3">
+        <div class="field"><label>Item Description *</label><input id="grItem" placeholder="Silver Chain 45g"></div>
+        <div class="field"><label>${T('metal')}</label><select id="grMetal"><option>Silver</option><option>Gold</option></select></div>
+        <div class="field"><label>${T('purity')} %</label><input type="number" id="grPurity" value="100"></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:12px;">
+        <div class="field"><label>${T('weight')} *</label><input type="number" step="0.001" id="grWeight"></div>
+        <div class="field"><label>Loan Amount *</label><input type="number" id="grLoanAmt"></div>
+        <div class="field"><label>Interest %/month</label><input type="number" id="grInterest" value="2"></div>
+      </div>
+      <div class="grid grid-2" style="margin-top:12px;">
+        <div class="field"><label>Loan Date <span class="helpText">(back-date allowed)</span></label><input type="date" id="grDate" value="${todayStr()}" max="${todayStr()}"></div>
+        <div class="field"><label>Due Date (optional)</label><input type="date" id="grDue"></div>
+      </div>
+      <div class="field" style="margin-top:12px;"><label>Reference</label><input id="grRefName" placeholder="Name of the person who referred this customer"></div>
     </div>
   `;
   openModal(T('newGirvi'), body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
-    {label:T('save'), cls:'btn-primary', onClick:saveGirvi}
+    {label:'📋 Save as Draft', cls:'btn-outline', onClick:()=>saveGirvi(true)},
+    {label:T('save'), cls:'btn-primary', onClick:()=>saveGirvi(false)}
   ]);
+  attachCustomerAutocomplete('grCustomer','grPhone');
 }
 /* Reusable: compress any uploaded/captured photo to a small JPEG data URL
    so it can never overflow localStorage. Used by Girvi and Customer photos. */
@@ -1913,26 +2099,82 @@ function handleGirviPhoto(e){
     document.getElementById('grPhotoPreview').outerHTML = `<img id="grPhotoPreview" src="${grPhotoData}" class="photoThumb">`;
   });
 }
-function saveGirvi(){
+function saveGirvi(isDraft){
   const name = document.getElementById('grCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
-  const cust = findOrCreateCustomer(name, document.getElementById('grPhone').value.trim());
+  const cust = resolveCustomer('grCustomer','grPhone');
+  if(grPhotoData){
+    cust.photo = grPhotoData;
+    cust.photos = cust.photos || [];
+    if(!cust.photos.includes(grPhotoData)) cust.photos.push(grPhotoData);
+  }
+  const itemDesc = document.getElementById('grItem').value.trim();
+  const weight = parseFloat(document.getElementById('grWeight').value)||0;
   const loanAmount = parseFloat(document.getElementById('grLoanAmt').value)||0;
   const gDate = document.getElementById('grDate').value || todayStr();
+  if(!isDraft){
+    const missing = [];
+    if(!itemDesc) missing.push('Item Description');
+    if(weight<=0) missing.push('Weight');
+    if(loanAmount<=0) missing.push('Loan Amount');
+    if(missing.length){ toast('Please fill: '+missing.join(', ')+' — or use "Save as Draft" if details are not ready yet'); return; }
+  }
   const g = {
     id: uid('GIR'), date: gDate, createdAt: nowISO(),
-    customerId:cust.id, customerName:cust.name, itemDesc: document.getElementById('grItem').value,
+    customerId:cust.id, customerName:cust.name, itemDesc,
     metal: document.getElementById('grMetal').value, purity: parseFloat(document.getElementById('grPurity').value)||100,
-    weight: parseFloat(document.getElementById('grWeight').value)||0,
+    weight,
     loanAmount, interestRatePct: parseFloat(document.getElementById('grInterest').value)||0,
-    dueDate: document.getElementById('grDue').value||'', status:'active', photo: grPhotoData,
-    outstandingPrincipal: loanAmount, lastInterestDate: gDate,
-    referenceName: document.getElementById('grRefName').value||'', forwards: [],
-    transactions: [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan'}]
+    dueDate: document.getElementById('grDue').value||'', status: isDraft?'draft':'active', photo: grPhotoData,
+    outstandingPrincipal: loanAmount, lastInterestDate: gDate, isDraft: !!isDraft,
+    referenceName: document.getElementById('grRefName').value||'', forwards: [], notes:'',
+    transactions: (isDraft && loanAmount<=0) ? [] : [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan'}]
   };
   DB.girvi.push(g);
-  logHistory('Girvi','Created', `Loan of ${fmtMoney(g.loanAmount)} against ${g.itemDesc} for ${cust.name}`);
-  saveDB(); closeModal(); toast('Girvi loan saved'); renderGirvi();
+  logHistory('Girvi', isDraft?'Draft Created':'Created', isDraft ? `Draft girvi started for ${cust.name} (details pending)` : `Loan of ${fmtMoney(g.loanAmount)} against ${g.itemDesc} for ${cust.name}`);
+  saveDB(); closeModal(); toast(isDraft?'Saved as draft — complete it later from the Girvi list':'Girvi loan saved'); renderGirvi();
+}
+function openGirviCompleteForm(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const body = `
+    <p class="helpText" style="margin-top:0;">Fill in the remaining details to activate this girvi entry.</p>
+    <div class="grid grid-3">
+      <div class="field"><label>Item Description *</label><input id="gcItem" value="${g.itemDesc||''}" placeholder="Silver Chain 45g"></div>
+      <div class="field"><label>${T('metal')}</label><select id="gcMetal"><option ${g.metal==='Silver'?'selected':''}>Silver</option><option ${g.metal==='Gold'?'selected':''}>Gold</option></select></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" id="gcPurity" value="${g.purity||100}"></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:12px;">
+      <div class="field"><label>${T('weight')} *</label><input type="number" step="0.001" id="gcWeight" value="${g.weight||''}"></div>
+      <div class="field"><label>Loan Amount *</label><input type="number" id="gcLoanAmt" value="${g.loanAmount||''}"></div>
+      <div class="field"><label>Interest %/month</label><input type="number" id="gcInterest" value="${g.interestRatePct||2}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Loan Date</label><input type="date" id="gcDate" value="${g.date}" max="${todayStr()}"></div>
+      <div class="field"><label>Due Date (optional)</label><input type="date" id="gcDue" value="${g.dueDate||''}"></div>
+    </div>
+  `;
+  openModal('Complete Girvi Entry — '+g.customerName, body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Activate', cls:'btn-primary', onClick:()=>{
+      const itemDesc = document.getElementById('gcItem').value.trim();
+      const weight = parseFloat(document.getElementById('gcWeight').value)||0;
+      const loanAmount = parseFloat(document.getElementById('gcLoanAmt').value)||0;
+      const missing = [];
+      if(!itemDesc) missing.push('Item Description');
+      if(weight<=0) missing.push('Weight');
+      if(loanAmount<=0) missing.push('Loan Amount');
+      if(missing.length){ toast('Please fill: '+missing.join(', ')); return; }
+      const gDate = document.getElementById('gcDate').value || g.date;
+      g.itemDesc = itemDesc; g.metal = document.getElementById('gcMetal').value;
+      g.purity = parseFloat(document.getElementById('gcPurity').value)||100; g.weight = weight;
+      g.loanAmount = loanAmount; g.interestRatePct = parseFloat(document.getElementById('gcInterest').value)||0;
+      g.date = gDate; g.dueDate = document.getElementById('gcDue').value||''; g.lastInterestDate = gDate;
+      g.outstandingPrincipal = loanAmount; g.status='active'; g.isDraft=false;
+      g.transactions = [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan (activated from draft)'}];
+      logHistory('Girvi','Activated', `Draft girvi for ${g.customerName} activated — loan ${fmtMoney(loanAmount)}`);
+      saveDB(); closeModal(); toast('Girvi activated'); renderGirvi();
+    }}
+  ]);
 }
 function viewGirvi(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
@@ -1950,9 +2192,10 @@ function viewGirvi(id){
     <div class="grid grid-2" style="margin-bottom:10px;">
       <div><b>Outstanding Principal:</b> ${fmtMoney(principal)}</div>
       <div><b>Interest Rate:</b> ${g.interestRatePct}% / month</div>
-      <div><b>Status:</b> ${g.status}</div>
+      <div><b>Status:</b> ${girviStatusTag(g)}</div>
       <div><b>Due Date:</b> ${g.dueDate?fmtDate(g.dueDate):'-'}</div>
     </div>
+    ${g.status==='draft'?`<div class="approveBox" style="background:var(--gold-pale);border-color:var(--gold-light);">📋 This is a draft entry — only the customer and photo were saved so far. Tap <b>Complete Entry</b> below to fill in the item, weight, and loan amount.</div>`:''}
     ${g.referenceName?`<div class="helpText" style="margin-bottom:10px;">🤝 <b>Referred by:</b> ${g.referenceName}</div>`:''}
     ${g.status==='active'?`<div class="approveBox">Estimated interest due since last entry: <b>${fmtMoney(girviInterestDue(g))}</b></div>`:''}
     ${g.status==='active'?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
@@ -1969,7 +2212,11 @@ function viewGirvi(id){
       <span style="display:flex;align-items:center;gap:8px;">${f.status==='forwarded'?`<span class="tag tag-gold">Forwarded</span><button class="btn btn-sm btn-outline" onclick="markGirviForwardReturned('${g.id}','${f.id}')">Mark Returned</button>`:'<span class="tag tag-green">Returned</span>'}<button class="btn btn-sm btn-danger" style="padding:3px 8px;" onclick="deleteGirviForward('${g.id}','${f.id}')">🗑</button></span></div>`).join('') || '<div class="txnRow">Not forwarded to anyone — money is with you.</div>'}</div>
   `;
   const foot = [{label:'Close', cls:'btn-ghost', onClick:closeModal}];
-  foot.push({label:'✎ Edit Details', cls:'btn-outline', onClick:()=>{ guardEdit('girvi loan for '+g.customerName, ()=>{ closeModal(); openGirviEditForm(g.id); }); }});
+  if(g.status==='draft'){
+    foot.push({label:'📋 Complete Entry', cls:'btn-gold', onClick:()=>{ closeModal(); openGirviCompleteForm(g.id); }});
+  } else {
+    foot.push({label:'✎ Edit Details', cls:'btn-outline', onClick:()=>{ guardEdit('girvi loan for '+g.customerName, ()=>{ closeModal(); openGirviEditForm(g.id); }); }});
+  }
   foot.push({label:'🖨 Print Receipt', cls:'btn-gold', onClick:()=>printGirviReceipt(g.id)});
   foot.push({label:'📄 PDF', cls:'btn-outline', onClick:()=>sharePdfGirvi(g.id)});
   if(g.status==='active'){
@@ -2079,11 +2326,11 @@ function openGirviEditForm(id){
     </div>
     <div class="field"><label>Customer Name</label><input id="egCustName" value="${g.customerName}"></div>
     <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Item Description</label><input id="egItem" value="${g.itemDesc}"></div>
+      <div class="field"><label>Item Description${g.isDraft?'':' *'}</label><input id="egItem" value="${g.itemDesc}"></div>
       <div class="field"><label>${T('metal')}</label><select id="egMetal"><option ${g.metal==='Silver'?'selected':''}>Silver</option><option ${g.metal==='Gold'?'selected':''}>Gold</option></select></div>
     </div>
     <div class="grid grid-3" style="margin-top:12px;">
-      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="egWeight" value="${g.weight}"></div>
+      <div class="field"><label>${T('weight')}${g.isDraft?'':' *'}</label><input type="number" step="0.001" id="egWeight" value="${g.weight}"></div>
       <div class="field"><label>${T('purity')} %</label><input type="number" id="egPurity" value="${g.purity||100}"></div>
       <div class="field"><label>Interest %/month</label><input type="number" id="egInterest" value="${g.interestRatePct}"></div>
     </div>
@@ -2098,6 +2345,14 @@ function openGirviEditForm(id){
   openModal('Edit Girvi Details — '+g.customerName, body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:'Save Changes', cls:'btn-primary', onClick:()=>{
+      const newItem = document.getElementById('egItem').value.trim();
+      const newWeight = parseFloat(document.getElementById('egWeight').value)||0;
+      if(!g.isDraft){
+        const missing = [];
+        if(!newItem) missing.push('Item Description');
+        if(newWeight<=0) missing.push('Weight');
+        if(missing.length){ toast('Please fill: '+missing.join(', ')); return; }
+      }
       const changes = [];
       const newName = document.getElementById('egCustName').value.trim();
       if(newName && newName!==g.customerName){
@@ -2105,11 +2360,10 @@ function openGirviEditForm(id){
         if(cust){ changes.push(`name: "${cust.name}" → "${newName}"`); cust.name = newName; }
         g.customerName = newName;
       }
-      const newItem = document.getElementById('egItem').value;
       if(newItem!==g.itemDesc) changes.push('item description updated');
       g.itemDesc = newItem;
       g.metal = document.getElementById('egMetal').value;
-      g.weight = parseFloat(document.getElementById('egWeight').value)||0;
+      g.weight = newWeight;
       g.purity = parseFloat(document.getElementById('egPurity').value)||100;
       g.interestRatePct = parseFloat(document.getElementById('egInterest').value)||0;
       g.date = document.getElementById('egDate').value || g.date;
@@ -2271,7 +2525,7 @@ function renderCredit(){
     <button class="btn btn-outline" onclick="openAddCreditCustomerForm()">+ Mark Customer as Credit</button>
     <button class="btn btn-primary" onclick="openCreditForm()">+ Add Entry</button>
   </div></div>`;
-  const creditCustomers = DB.customers.filter(c=>c.creditEnabled);
+  const creditCustomers = DB.customers.filter(c=>c.creditEnabled && !c.mergedInto);
   html += `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">`;
   const totalDue = creditCustomers.reduce((a,c)=>a+Math.max(customerBalance(c.id),0),0);
   const customersWithDue = creditCustomers.filter(c=>customerBalance(c.id)>0).length;
@@ -2361,26 +2615,29 @@ function unmarkCreditCustomer(id){
 function openCreditForm(prefillName){
   const body = `
     <div class="grid grid-2">
-      <div class="field"><label>${T('customer')} *</label><input list="custList4" id="crCustomer" value="${prefillName?prefillName:''}">
-      <datalist id="custList4">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
-      <div class="field"><label>${T('date')} <span class="helpText">(back-date allowed)</span></label><input type="date" id="crDate" value="${todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>${T('customer')} *</label><input id="crCustomer" value="${prefillName?prefillName:''}"></div>
+      <div class="field"><label>${T('phone')}</label><input id="crPhone" placeholder="Optional — helps find the right person"></div>
     </div>
     <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>${T('date')} <span class="helpText">(back-date allowed)</span></label><input type="date" id="crDate" value="${todayStr()}" max="${todayStr()}"></div>
       <div class="field"><label>Entry Type</label><select id="crType" onchange="document.getElementById('crDueWrap').style.display=this.value==='debit'?'block':'none'"><option value="debit">Udhaar Given (they owe more)</option><option value="credit">Payment Received (reduce due)</option></select></div>
-      <div class="field"><label>Amount</label><input type="number" id="crAmount"></div>
     </div>
-    <div class="field" id="crDueWrap" style="margin-top:12px;"><label>Due Date (optional)</label><input type="date" id="crDueDate"></div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Amount</label><input type="number" id="crAmount"></div>
+      <div class="field" id="crDueWrap"><label>Due Date (optional)</label><input type="date" id="crDueDate"></div>
+    </div>
     <div class="field" style="margin-top:12px;"><label>Note</label><input id="crDesc" placeholder="Reason / description"></div>
   `;
   openModal('New Credit Entry', body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:T('save'), cls:'btn-primary', onClick:saveCredit}
   ]);
+  attachCustomerAutocomplete('crCustomer','crPhone');
 }
 function saveCredit(){
   const name = document.getElementById('crCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
-  const cust = findOrCreateCustomer(name,'');
+  const cust = resolveCustomer('crCustomer','crPhone');
   const amt = parseFloat(document.getElementById('crAmount').value)||0;
   const type = document.getElementById('crType').value;
   const crDate = document.getElementById('crDate').value || todayStr();
@@ -3051,12 +3308,13 @@ function updateJobStatus(id, status){
 }
 function openJobForm(id){
   const j = id ? DB.jobs.find(x=>x.id===id) : null;
+  const custRec = j ? DB.customers.find(c=>c.id===j.customerId) : null;
   const body = `
     <div class="grid grid-2">
-      <div class="field"><label>${T('customer')} *</label><input list="custList5" id="jbCustomer" value="${j?j.customerName:''}">
-      <datalist id="custList5">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
-      <div class="field"><label>Job Type</label><select id="jbType"><option ${j&&j.type==='Manufacturing'?'selected':''}>Manufacturing</option><option ${j&&j.type==='Repair'?'selected':''}>Repair</option></select></div>
+      <div class="field"><label>${T('customer')} *</label><input id="jbCustomer" value="${j?j.customerName:''}"></div>
+      <div class="field"><label>${T('phone')}</label><input id="jbPhone" value="${custRec?custRec.phone||'':''}" placeholder="Optional"></div>
     </div>
+    <div class="field" style="margin-top:12px;"><label>Job Type</label><select id="jbType"><option ${j&&j.type==='Manufacturing'?'selected':''}>Manufacturing</option><option ${j&&j.type==='Repair'?'selected':''}>Repair</option></select></div>
     <div class="field" style="margin-top:12px;"><label>Item Description</label><input id="jbItem" placeholder="e.g. New silver ring from old chain" value="${j?j.itemDesc:''}"></div>
     <div class="field" style="margin-top:12px;"><label>Given to Karigar (optional)</label><input id="jbKarigar" placeholder="Karigar's name, if job given out" value="${j?j.karigarName||'':''}"></div>
     <div class="grid grid-3" style="margin-top:12px;">
@@ -3075,11 +3333,12 @@ function openJobForm(id){
     {label:'📄 PDF', cls:'btn-outline', onClick:()=>{ if(id){ closeModal(); sharePdfJob(id); } else toast('Save the job first, then share'); }},
     {label:j?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveJob(id)}
   ]);
+  attachCustomerAutocomplete('jbCustomer','jbPhone');
 }
 function saveJob(id){
   const name = document.getElementById('jbCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
-  const cust = findOrCreateCustomer(name,'');
+  const cust = resolveCustomer('jbCustomer','jbPhone');
   const karigarName = document.getElementById('jbKarigar').value||'';
   if(id){
     const j = DB.jobs.find(x=>x.id===id); if(!j) return;
@@ -3127,12 +3386,13 @@ function renderExchange(){
 }
 function openExForm(id){
   const e = id ? DB.exchange.find(x=>x.id===id) : null;
+  const custRec = e ? DB.customers.find(c=>c.id===e.customerId) : null;
   const body = `
     <div class="grid grid-2">
-      <div class="field"><label>${T('customer')} *</label><input list="custList6" id="exCustomer" value="${e?e.customerName:''}">
-      <datalist id="custList6">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
-      <div class="field"><label>${T('date')}</label><input type="date" id="exDate" value="${e?e.date:todayStr()}" max="${todayStr()}"></div>
+      <div class="field"><label>${T('customer')} *</label><input id="exCustomer" value="${e?e.customerName:''}"></div>
+      <div class="field"><label>${T('phone')}</label><input id="exPhone" value="${custRec?custRec.phone||'':''}" placeholder="Optional"></div>
     </div>
+    <div class="field" style="margin-top:12px;"><label>${T('date')}</label><input type="date" id="exDate" value="${e?e.date:todayStr()}" max="${todayStr()}"></div>
     <div class="grid grid-2" style="margin-top:12px;">
       <div class="field"><label>Old Item Description</label><input id="exOldItem" value="${e?e.oldItemDesc:''}"></div>
       <div class="field"><label>Old Item Value</label><input type="number" id="exOldVal" value="${e?e.oldValue:''}" oninput="exRecalc()"></div>
@@ -3148,6 +3408,7 @@ function openExForm(id){
     {label:e?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveEx(id)}
   ]);
   exRecalc();
+  attachCustomerAutocomplete('exCustomer','exPhone');
 }
 function exRecalc(){
   const o=parseFloat(document.getElementById('exOldVal').value)||0, n=parseFloat(document.getElementById('exNewVal').value)||0;
@@ -3156,7 +3417,7 @@ function exRecalc(){
 function saveEx(id){
   const name=document.getElementById('exCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
-  const cust = findOrCreateCustomer(name,'');
+  const cust = resolveCustomer('exCustomer','exPhone');
   const oldVal=parseFloat(document.getElementById('exOldVal').value)||0, newVal=parseFloat(document.getElementById('exNewVal').value)||0;
   const exDate = document.getElementById('exDate')?.value || todayStr();
   if(id){
@@ -3194,7 +3455,7 @@ function renderLedger(){
 }
 function renderLedgerList(){
   const q=(document.getElementById('ledgerSearch')?.value||'').toLowerCase();
-  let rows = [...DB.customers].filter(c=>c.name.toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.village||'').toLowerCase().includes(q));
+  let rows = [...DB.customers].filter(c=>!c.mergedInto && (c.name.toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.village||'').toLowerCase().includes(q)));
   let html = `<table><tr><th></th><th>Name</th><th>Phone</th><th>Village</th><th>Balance</th><th>Sales</th><th>Girvi</th><th></th></tr>`;
   if(rows.length===0) html+=`<tr><td colspan="8"><div class="empty"><div class="big">👤</div>No customers found.</div></td></tr>`;
   rows.forEach(c=>{
@@ -3262,8 +3523,56 @@ function viewCustomerLedger(id){
   openModal(c.name+' — Profile', body, [
     {label:'Close', cls:'btn-ghost', onClick:closeModal},
     {label:'✎ Edit Profile', cls:'btn-outline', onClick:()=>{ closeModal(); openCustomerProfileForm(id); }},
+    {label:'🔀 Merge Duplicate', cls:'btn-outline', onClick:()=>{ closeModal(); openMergePicker(id); }},
     {label:'+ Add Credit Entry', cls:'btn-outline', onClick:()=>{ closeModal(); openCreditForm(c.name); }}
   ]);
+}
+/* ---------------------- CUSTOMER MERGE (duplicate cleanup) ---------------------- */
+function openMergePicker(primaryId){
+  const primary = DB.customers.find(x=>x.id===primaryId); if(!primary) return;
+  const body = `
+    <p class="helpText" style="margin-top:0;">Merging keeps <b>${primary.name}</b> as the main profile and moves every sale, girvi, buying, credit, job, and exchange record from the duplicate onto it. Nothing is deleted — the duplicate is kept for reference but hidden from lists.</p>
+    <input id="mergeSearch" placeholder="Search the duplicate customer to merge in..." style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:8px;margin-bottom:10px;" oninput="renderMergeCandidates('${primaryId}', this.value)">
+    <div id="mergeCandidateList" style="max-height:45vh;overflow-y:auto;"></div>
+  `;
+  openModal('Merge Into "'+primary.name+'"', body, [{label:'Cancel', cls:'btn-ghost', onClick:closeModal}]);
+  renderMergeCandidates(primaryId, '');
+}
+function renderMergeCandidates(primaryId, q){
+  q = (q||'').toLowerCase();
+  const box = document.getElementById('mergeCandidateList'); if(!box) return;
+  const matches = DB.customers.filter(c=> c.id!==primaryId && !c.mergedInto && (!q || c.name.toLowerCase().includes(q) || (c.phone||'').includes(q)));
+  if(matches.length===0){ box.innerHTML = `<div class="empty"><div class="big">🔀</div>${q?'No matching customers.':'Type a name or phone to find the duplicate record.'}</div>`; return; }
+  box.innerHTML = matches.slice(0,20).map(c=>`<div class="searchResultRow" onclick="confirmMergeCustomers('${primaryId}','${c.id}')">
+    <span>${c.photo?`<img src="${c.photo}" class="photoThumb" style="width:24px;height:24px;margin-right:6px;vertical-align:middle;">`:''}${c.name}${c.phone?' — '+c.phone:''}${c.village?' ('+c.village+')':''}</span><span>Merge In →</span></div>`).join('');
+}
+function confirmMergeCustomers(primaryId, duplicateId){
+  const primary = DB.customers.find(x=>x.id===primaryId), dup = DB.customers.find(x=>x.id===duplicateId);
+  if(!primary || !dup) return;
+  guardEdit('customer merge', ()=>{
+    confirmAction(`Merge "${dup.name}" into "${primary.name}"? All of ${dup.name}'s transactions will move to ${primary.name}, and ${dup.name} will no longer appear as a separate customer. This cannot be easily undone.`, ()=>{
+      mergeCustomers(primaryId, duplicateId);
+    });
+  });
+}
+function mergeCustomers(primaryId, duplicateId){
+  const primary = DB.customers.find(x=>x.id===primaryId), dup = DB.customers.find(x=>x.id===duplicateId);
+  if(!primary || !dup) return;
+  ['phone','village','referredBy','familyLink','tags','notes'].forEach(f=>{ if(!primary[f] && dup[f]) primary[f]=dup[f]; });
+  if(!primary.photo && dup.photo) primary.photo = dup.photo;
+  if(!Array.isArray(primary.photos)) primary.photos = primary.photo?[primary.photo]:[];
+  if(Array.isArray(dup.photos)) dup.photos.forEach(p=>{ if(!primary.photos.includes(p)) primary.photos.push(p); });
+  if(!primary.creditEnabled && dup.creditEnabled) primary.creditEnabled = true;
+  let moved = 0;
+  ['sales','buying','girvi','creditEntries','jobs','exchange'].forEach(coll=>{
+    (DB[coll]||[]).forEach(rec=>{
+      if(rec.customerId===duplicateId){ rec.customerId=primaryId; rec.customerName=primary.name; moved++; }
+    });
+  });
+  dup.mergedInto = primaryId;
+  dup.deleted = true;
+  logHistory('Customer','Merged', `${dup.name} merged into ${primary.name} — ${moved} record(s) moved`);
+  saveDB(); closeModal(); toast(`Merged — ${moved} record(s) now under ${primary.name}`); viewCustomerLedger(primaryId);
 }
 let custPhotoData = null;
 function openCustomerProfileForm(id){
