@@ -344,7 +344,7 @@ function defaultDB(){
       discountApprovalThresholdPct: 3, lastBackupAt:null,
       gstin:'', bisLicenceNo:'', signatureLine:'For Gayatri Jewellers',
       billTermsNote:'Goods once sold will not be taken back or exchanged except as per shop policy. All disputes subject to local jurisdiction.',
-      autoLockMinutes: 0, backupReminderDays: 3
+      autoLockMinutes: 0, backupReminderDays: 3, recordCountSnapshot: null, recordCountSnapshotAt: null
     },
     rateHistory:[],
     currentRates:{ gold24:9800, gold22:8990, silverKg:88000, updatedAt: nowISO() },
@@ -363,6 +363,13 @@ function defaultDB(){
 function migrateDB(d){
   if(!d.wholesalers) d.wholesalers=[];
   if(!d.wholesalerEntries) d.wholesalerEntries=[];
+  (d.wholesalerEntries||[]).forEach(e=>{
+    // Normalize metal to exactly 'Gold' or 'Silver' regardless of how it was
+    // originally stored (case/whitespace) — this is the safeguard against
+    // gold entries silently falling into the silver bucket in totals.
+    const m = String(e.metal||'').trim().toLowerCase();
+    e.metal = m==='gold' ? 'Gold' : 'Silver';
+  });
   if(!d.marketRates) d.marketRates={ goldUsdOz:null, silverUsdOz:null, usdInr:null, fxSource:null, fetchedAt:null, source:null, lastError:null, mcxPremiumPctGold:15, mcxPremiumPctSilver:25 };
   else {
     const old = d.marketRates.mcxPremiumPct;
@@ -384,6 +391,8 @@ function migrateDB(d){
     if(d.meta.billTermsNote===undefined) d.meta.billTermsNote='Goods once sold will not be taken back or exchanged except as per shop policy. All disputes subject to local jurisdiction.';
     if(d.meta.autoLockMinutes===undefined) d.meta.autoLockMinutes=0;
     if(d.meta.backupReminderDays===undefined) d.meta.backupReminderDays=3;
+    if(d.meta.recordCountSnapshot===undefined) d.meta.recordCountSnapshot=null;
+    if(d.meta.recordCountSnapshotAt===undefined) d.meta.recordCountSnapshotAt=null;
   }
   (d.girvi||[]).forEach(g=>{
     if(!g.transactions){
@@ -411,7 +420,23 @@ function migrateDB(d){
     if(i.qty===undefined) i.qty=1;
     if(i.pricePerPiece===undefined) i.pricePerPiece=0;
   }); });
-  (d.buying||[]).forEach(b=>{ if(b.purity===undefined || b.purity==='') b.purity=100; if(b.linkedGirviId===undefined) b.linkedGirviId=null; if(b.notes===undefined) b.notes=''; });
+  (d.buying||[]).forEach(b=>{
+    if(b.purity===undefined || b.purity==='') b.purity=100;
+    if(b.linkedGirviId===undefined) b.linkedGirviId=null;
+    if(b.notes===undefined) b.notes='';
+    if(!Array.isArray(b.items)){
+      // Old single-item purchase — synthesize a matching line item so every
+      // purchase can be treated uniformly as "one or more items", without
+      // touching the original top-level fields (still read by old code paths).
+      b.items = [{
+        itemDesc: b.itemDesc||'', metal: b.metal||'Silver', purity: b.purity,
+        weight: Number(b.weight)||0, rate: Number(b.rateApplied)||0, making:0, labour:0,
+        amount: Number(b.amount)||0
+      }];
+    }
+    if(b.making===undefined) b.making=0;
+    if(b.labour===undefined) b.labour=0;
+  });
   (d.customers||[]).forEach(c=>{
     if(c.photo===undefined) c.photo=null;
     if(c.village===undefined) c.village='';
@@ -427,7 +452,7 @@ function migrateDB(d){
     if(c.mergedInto===undefined) c.mergedInto=null;
     if(!Array.isArray(c.photos)) c.photos = c.photo ? [c.photo] : [];
   });
-  (d.creditEntries||[]).forEach(e=>{ if(e.dueDate===undefined) e.dueDate=''; });
+  (d.creditEntries||[]).forEach(e=>{ if(e.dueDate===undefined) e.dueDate=''; if(e.linkedSaleId===undefined) e.linkedSaleId=null; });
   (d.inventory||[]).forEach(i=>{
     ['subcategory','designGroup','size','pairSingle','style','stoneOrNot','customAttr','batchNo','karigarSource','remarks','weightType','sourceType','wholesalerId'].forEach(f=>{
       if(i[f]===undefined) i[f]='';
@@ -768,9 +793,15 @@ function renderDashboard(){
   const pendingJobs = DB.jobs.filter(j=>j.status!=='delivered' && !j.void && !j.deleted);
   const lowStock = DB.inventory.filter(i=>invIsAvailable(i) && !i.deleted);
   const overdueGirvi = activeGirvi.filter(g=>g.dueDate && g.dueDate < today);
-  const wholesalerTotals = DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,cash:0});
+  const wholesalerTotals = DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.gold+=Math.max(b.goldOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,gold:0,cash:0});
 
   let html = '';
+  if(window._countDropWarning){
+    html += `<div class="backupWarnBanner" style="background:var(--danger-bg);border-color:var(--danger);">
+      <div>🚨 <b>Your data looks smaller than last time you opened this app:</b> ${window._countDropWarning}. This almost always means you're opening a different copy of the app than usual (e.g. an old Home Screen icon or a re-downloaded file) — your other entries are very likely safe in that other copy, not lost. If this is unexpected, stop and check before making new entries, and get in touch about it.</div>
+      <button class="btn btn-sm btn-ghost" onclick="dismissCountDropWarning()">I understand, dismiss</button>
+    </div>`;
+  }
   const backupDays = DB.meta.backupReminderDays||3;
   const daysSinceBackup = DB.meta.lastBackupAt ? daysBetween(DB.meta.lastBackupAt.slice(0,10)) : null;
   if(daysSinceBackup===null || daysSinceBackup>=backupDays){
@@ -786,7 +817,7 @@ function renderDashboard(){
     <div class="statCard" style="border-color:var(--maroon)"><div class="lbl">🏦 Forwarded Rakam</div><div class="val">${fmtMoney(totalForwardedOut)}</div><div class="sub">${activeForwarded.length} entr${activeForwarded.length===1?'y':'ies'} • <span style="cursor:pointer;text-decoration:underline;" onclick="openForwardedRakamList()">View</span></div></div>
     <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Total Credit Due</div><div class="val">${fmtMoney(creditDue)}</div><div class="sub">across ${DB.customers.length} customers</div></div>
     <div class="statCard" style="border-color:var(--success)"><div class="lbl">Pending Jobs</div><div class="val">${pendingJobs.length}</div><div class="sub">${DB.inventory.filter(i=>invIsAvailable(i) && !i.deleted).length} items in stock</div></div>
-    <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Silver Owed to Wholesalers</div><div class="val">${fmtWt(wholesalerTotals.silver)}</div><div class="sub">Cash/labour owed: ${fmtMoney(wholesalerTotals.cash)}</div></div>
+    <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Owed to Wholesalers</div><div class="val" style="font-size:16px;">🥈${fmtWt(wholesalerTotals.silver)} • 🥇${fmtWt(wholesalerTotals.gold)}</div><div class="sub">Cash/labour owed: ${fmtMoney(wholesalerTotals.cash)}</div></div>
   </div>`;
 
   html += `<div class="grid grid-2">`;
@@ -917,6 +948,7 @@ function deleteSale(id){
   guardDelete('sale bill ('+s.billNo+')', ()=>{
     s.deleted = true;
     releaseInventoryForSale(s);
+    DB.creditEntries.filter(e=>e.linkedSaleId===s.id && !e.deleted).forEach(e=>{ e.deleted=true; });
     logHistory('Sales','Deleted', `Bill ${s.billNo} for ${s.customerName} deleted`);
     saveDB(); closeModal(); renderSales(); toast('Bill deleted');
   });
@@ -1010,10 +1042,8 @@ function renderSaleItemRows(){
         <button class="btn btn-sm btn-ghost" style="margin-top:3px;padding:2px 6px;font-size:10px;" onclick="pickInventoryForSaleItem(${i})">🔗 ${linkedItem?'Linked: '+linkedItem.code:'Link Stock'}</button></div>
       <div class="field"><label>${T('category')}</label>
         <select onchange="saleDraftItems[${i}].category=this.value; autoFillRate(${i}); recalcSaleTotals();">
-          <option ${it.category==='Silver'?'selected':''}>Silver</option>
+          <option ${(it.category==='Silver'||it.category==='Part Silver'||it.category==='Khirchi Silver')?'selected':''}>Silver</option>
           <option ${it.category==='Gold'?'selected':''}>Gold</option>
-          <option ${it.category==='Part Silver'?'selected':''}>Part Silver</option>
-          <option ${it.category==='Khirchi Silver'?'selected':''}>Khirchi Silver</option>
           <option ${it.category==='Custom'?'selected':''}>Custom</option>
         </select></div>
       <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" value="${it.weight}" oninput="saleDraftItems[${i}].weight=parseFloat(this.value)||0; recalcSaleTotals();"></div>
@@ -1087,6 +1117,26 @@ function recalcSaleTotals(){
     } else note.innerHTML='';
   }
 }
+/* Keeps a sale's auto-generated credit entry in sync with its current
+   balance — used on create, edit, and void. Never creates duplicates:
+   any previous auto-entry for this sale is soft-removed first. Also
+   auto-enables the customer for the Credit module, since a part/full
+   credit sale is a clear signal they should be visible there. */
+function syncSaleCreditEntry(sale, cust){
+  DB.creditEntries.filter(e=>e.linkedSaleId===sale.id && !e.deleted).forEach(e=>{ e.deleted=true; });
+  const balance = sale.grandTotal - sale.amountPaid;
+  if(balance > 0.004){
+    const itemNames = (sale.items||[]).map(i=>i.itemName).filter(Boolean).join(', ');
+    DB.creditEntries.push({
+      id:uid('CR'), customerId:cust.id, date:sale.date, dueDate:'', type:'debit', amount:balance,
+      description: (itemNames?itemNames+' — ':'')+'Sale '+sale.billNo, createdAt: nowISO(), linkedSaleId: sale.id, deleted:false
+    });
+    if(!cust.creditEnabled){
+      cust.creditEnabled = true;
+      logHistory('Customer','Credit Enabled', cust.name+' auto-marked as credit customer (sale on credit)');
+    }
+  }
+}
 function saveSale(){
   const custName = document.getElementById('saleCustomer').value.trim();
   if(!custName){ toast('Please enter customer name'); return; }
@@ -1114,6 +1164,7 @@ function saveSale(){
       s.customerId=cust.id; s.customerName=cust.name; s.date=saleDate; s.items=cleanItems;
       s.subTotal=sub; s.discount=discount; s.discountPct=pct; s.grandTotal=grand; s.paymentMode=payMode; s.amountPaid=amountPaid;
       applyInventoryDeduction(s);
+      syncSaleCreditEntry(s, cust);
       logHistory('Sales','Edited', `Bill ${s.billNo} edited for ${cust.name} — new total ${fmtMoney(grand)}`);
       saveDB(); closeModal(); toast('Sale updated: '+s.billNo); renderSales();
     } else {
@@ -1124,9 +1175,7 @@ function saveSale(){
       };
       DB.sales.push(sale);
       applyInventoryDeduction(sale);
-      if(amountPaid < grand){
-        DB.creditEntries.push({id:uid('CR'), customerId:cust.id, date:saleDate, type:'debit', amount: grand-amountPaid, description:'Sale '+sale.billNo, createdAt: nowISO()});
-      }
+      syncSaleCreditEntry(sale, cust);
       logHistory('Sales','Created', `Bill ${sale.billNo} for ${cust.name} — ${fmtMoney(grand)}`);
       saveDB(); closeModal(); toast('Sale saved: '+sale.billNo); renderSales();
     }
@@ -1136,26 +1185,54 @@ function saveSale(){
     askOwnerApproval(`This bill has a discount of ${pct.toFixed(1)}%, above the allowed ${DB.meta.discountApprovalThresholdPct}%. Owner PIN is required to proceed.`, ()=>finalize());
   } else finalize();
 }
-/* Marks every inventory item linked to this sale's items as sold, and logs it.
-   Called on both new sales and edits (edits release old links first). */
+/* Deducts the ACTUAL sold weight (and 1 piece) from a linked inventory lot —
+   not the whole lot. Stores the exact amount deducted on the sale item itself
+   so voiding/deleting/editing the sale can restore precisely, never guessing. */
 function applyInventoryDeduction(sale){
   sale.items.forEach(it=>{
     if(!it.linkedInventoryId) return;
     const inv = DB.inventory.find(x=>x.id===it.linkedInventoryId && !x.deleted);
-    if(!inv) return;
+    if(!inv){ it.linkedInvDeductedWeight=0; it.linkedInvDeductedPieces=0; return; }
+    const soldWeight = Number(it.weight)||0;
+    const availableWeight = Number(inv.weight)||0;
+    const availableQty = Number(inv.qty)||0;
+    const insufficientWeight = soldWeight > availableWeight;
+    const insufficientQty = availableQty <= 0;
+    const deductWeight = Math.min(soldWeight, availableWeight); // never allow negative stock
+    const deductPieces = insufficientQty ? 0 : 1;
     const oldLoc = inv.location;
-    inv.status = 'sold'; inv.soldDate = sale.date; inv.linkedSaleId = sale.id; inv.qty = Math.max((Number(inv.qty)||1)-1, 0);
-    logInventoryMovement(inv.id, 'Available → Sold', {fromLocation:oldLoc, toLocation:'Customer', weightChange:-(Number(inv.weight)||0), reference:sale.billNo, notes:'Sold via bill '+sale.billNo});
-    logHistory('Inventory','Sold', `${inv.itemName} (${inv.code}) sold via bill ${sale.billNo} — weight ${fmtWt(inv.weight)} and 1 unit removed from available stock`);
+    inv.weight = Math.max(availableWeight - deductWeight, 0);
+    inv.qty = Math.max(availableQty - deductPieces, 0);
+    it.linkedInvDeductedWeight = deductWeight;
+    it.linkedInvDeductedPieces = deductPieces;
+    const exhausted = inv.weight<=0 || inv.qty<=0;
+    if(exhausted){ inv.status='sold'; inv.soldDate=sale.date; }
+    inv.linkedSaleId = sale.id;
+    const warn = (insufficientWeight||insufficientQty) ? ' ⚠️ Recorded stock was insufficient for this sale — clamped to zero, please physically recount this lot.' : '';
+    logInventoryMovement(inv.id, exhausted?'Sold — lot exhausted':'Sold (partial from lot)', {fromLocation:oldLoc, toLocation: exhausted?'Customer':oldLoc, weightChange:-deductWeight, reference:sale.billNo, notes:`${fmtWt(deductWeight)} / ${deductPieces} pc sold via bill ${sale.billNo}. Remaining: ${fmtWt(inv.weight)}, ${inv.qty} pc(s).${warn}`});
+    logHistory('Inventory', insufficientWeight||insufficientQty?'Sold — Stock Warning':'Sold', `${inv.itemName} (${inv.code}): ${fmtWt(deductWeight)} sold via bill ${sale.billNo}. Remaining ${fmtWt(inv.weight)} / ${inv.qty} pc(s).${warn}`);
+    if(insufficientWeight||insufficientQty) toast('⚠️ Stock for '+inv.itemName+' was insufficient — reduced to zero. Please recount.');
   });
 }
-/* Reverses the sold status on any inventory linked to this sale — used when
-   a bill is voided or deleted, so stock stays accurate. */
+/* Reverses exactly what applyInventoryDeduction did for this sale's items —
+   restores the precise weight/pieces that were deducted, not a guess. Used
+   when a bill is voided, deleted, or edited (edits release-then-reapply). */
 function releaseInventoryForSale(sale){
-  DB.inventory.filter(inv=>inv.linkedSaleId===sale.id).forEach(inv=>{
-    inv.status='available'; inv.linkedSaleId=null; inv.soldDate=null; inv.qty = (Number(inv.qty)||0)+1;
-    logInventoryMovement(inv.id, 'Sold → Available', {fromLocation:'Customer', toLocation:inv.location||'Showcase', weightChange:(Number(inv.weight)||0), reference:sale.billNo, notes:'Bill voided/deleted — item returned to stock'});
-    logHistory('Inventory','Returned to Stock', `${inv.itemName} (${inv.code}) returned to stock — bill ${sale.billNo} was voided/deleted`);
+  sale.items.forEach(it=>{
+    if(!it.linkedInventoryId) return;
+    const inv = DB.inventory.find(x=>x.id===it.linkedInventoryId && !x.deleted);
+    if(!inv) return;
+    const restoreWeight = Number(it.linkedInvDeductedWeight||0);
+    const restorePieces = Number(it.linkedInvDeductedPieces||0);
+    if(restoreWeight<=0 && restorePieces<=0) return;
+    const wasExhausted = inv.status==='sold';
+    inv.weight = (Number(inv.weight)||0) + restoreWeight;
+    inv.qty = (Number(inv.qty)||0) + restorePieces;
+    if(wasExhausted && (inv.weight>0 || inv.qty>0)){ inv.status='available'; inv.soldDate=null; }
+    inv.linkedSaleId = null;
+    logInventoryMovement(inv.id, 'Sale voided/edited — stock restored', {fromLocation:'Customer', toLocation:inv.location||'Showcase', weightChange:restoreWeight, reference:sale.billNo, notes:`${fmtWt(restoreWeight)} / ${restorePieces} pc(s) restored — bill ${sale.billNo} voided, deleted, or re-edited.`});
+    logHistory('Inventory','Returned to Stock', `${inv.itemName} (${inv.code}): ${fmtWt(restoreWeight)} / ${restorePieces} pc(s) restored — bill ${sale.billNo} voided/deleted/edited.`);
+    it.linkedInvDeductedWeight = 0; it.linkedInvDeductedPieces = 0; // prevent double-restore
   });
 }
 function viewSale(id){
@@ -1187,7 +1264,7 @@ function viewSale(id){
     foot.push({label:'✎ Edit', cls:'btn-outline', onClick:()=>{ guardEdit('sale bill ('+s.billNo+')', ()=>openSaleForm(s.id)); }});
     foot.push({label:'Void Bill', cls:'btn-danger', onClick:()=>{
       askOwnerApproval('Voiding a bill requires owner approval. This will not delete the record — it stays in History.', ()=>{
-        s.void=true; releaseInventoryForSale(s); logHistory('Sales','Voided','Bill '+s.billNo+' voided'); saveDB(); closeModal(); renderSales(); toast('Bill voided');
+        s.void=true; releaseInventoryForSale(s); DB.creditEntries.filter(e=>e.linkedSaleId===s.id && !e.deleted).forEach(e=>{ e.deleted=true; }); logHistory('Sales','Voided','Bill '+s.billNo+' voided'); saveDB(); closeModal(); renderSales(); toast('Bill voided');
       });
     }});
   }
@@ -1688,13 +1765,23 @@ async function sharePdfReceipt(docTitle, rows, extraNote, filenamePrefix, histor
 }
 function sharePdfBuying(id){
   const b = DB.buying.find(x=>x.id===id); if(!b) return;
-  const purity = (b.purity===undefined||b.purity==='')?100:b.purity;
-  const pw = (b.weight||0)*(purity/100);
-  const rows = [
-    ['Date', fmtDate(b.date)], ['Customer', b.customerName], ['Item', b.itemDesc], ['Metal', b.metal],
-    ['Weight', fmtWt(b.weight)], ['Purity', purity+'%'], ['Pure Weight', fmtWt(pw)],
-    ['Rate', fmtMoney(b.rateApplied)+'/g'], ['Amount Paid', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]
-  ];
+  let rows;
+  if(b.items && b.items.length>1){
+    rows = [['Date', fmtDate(b.date)], ['Customer', b.customerName]];
+    b.items.forEach((it,idx)=>{
+      const p=(it.purity===undefined||it.purity==='')?100:it.purity;
+      rows.push([`Item ${idx+1}`, `${it.itemDesc} — ${it.metal}, ${fmtWt(it.weight)} @ ${p}%, ${fmtMoney(it.amount)}`]);
+    });
+    rows.push(['Total Weight', fmtWt(b.weight)], ['Total Amount', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]);
+  } else {
+    const purity = (b.purity===undefined||b.purity==='')?100:b.purity;
+    const pw = (b.weight||0)*(purity/100);
+    rows = [
+      ['Date', fmtDate(b.date)], ['Customer', b.customerName], ['Item', b.itemDesc], ['Metal', b.metal],
+      ['Weight', fmtWt(b.weight)], ['Purity', purity+'%'], ['Pure Weight', fmtWt(pw)],
+      ['Rate', fmtMoney(b.rateApplied)+'/g'], ['Amount Paid', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]
+    ];
+  }
   sharePdfReceipt('Purchase Receipt', rows, null, 'Purchase-'+b.id, 'Buying', `Receipt shared as PDF for purchase from ${b.customerName}`);
 }
 function sharePdfGirvi(id){
@@ -1750,13 +1837,23 @@ function printGenericReceipt(docTitle, rows, extraNote, historyModule, historyDe
 }
 function printBuyingReceipt(id){
   const b = DB.buying.find(x=>x.id===id); if(!b) return;
-  const purity = (b.purity===undefined||b.purity==='')?100:b.purity;
-  const pw = (b.weight||0)*(purity/100);
-  const rows = [
-    ['Date', fmtDate(b.date)], ['Customer', b.customerName], ['Item', b.itemDesc], ['Metal', b.metal],
-    ['Weight', fmtWt(b.weight)], ['Purity', purity+'%'], ['Pure Weight', fmtWt(pw)],
-    ['Rate', fmtMoney(b.rateApplied)+'/g'], ['Amount Paid', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]
-  ];
+  let rows;
+  if(b.items && b.items.length>1){
+    rows = [['Date', fmtDate(b.date)], ['Customer', b.customerName]];
+    b.items.forEach((it,idx)=>{
+      const p=(it.purity===undefined||it.purity==='')?100:it.purity;
+      rows.push([`Item ${idx+1}`, `${it.itemDesc} — ${it.metal}, ${fmtWt(it.weight)} @ ${p}%, ${fmtMoney(it.amount)}`]);
+    });
+    rows.push(['Total Weight', fmtWt(b.weight)], ['Total Amount', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]);
+  } else {
+    const purity = (b.purity===undefined||b.purity==='')?100:b.purity;
+    const pw = (b.weight||0)*(purity/100);
+    rows = [
+      ['Date', fmtDate(b.date)], ['Customer', b.customerName], ['Item', b.itemDesc], ['Metal', b.metal],
+      ['Weight', fmtWt(b.weight)], ['Purity', purity+'%'], ['Pure Weight', fmtWt(pw)],
+      ['Rate', fmtMoney(b.rateApplied)+'/g'], ['Amount Paid', fmtMoney(b.amount)], ['Payment Mode', b.paymentMode]
+    ];
+  }
   printGenericReceipt('Purchase Receipt', rows, null, 'Buying', `Receipt printed for purchase from ${b.customerName}`);
 }
 function printGirviReceipt(id){
@@ -1859,7 +1956,8 @@ function renderBuyTable(){
   rows.forEach(b=>{
     const purity = (b.purity===undefined||b.purity==='')?100:Number(b.purity);
     const pw = (Number(b.weight)||0) * (purity/100);
-    html += `<tr><td>${fmtDate(b.date)}</td><td>${b.customerName}</td><td>${b.itemDesc}</td><td>${b.metal}</td><td>${fmtWt(b.weight)}</td><td>${purity}%</td><td>${fmtWt(pw)}</td><td>${fmtMoney(b.rateApplied)}</td><td>${fmtMoney(b.amount)}</td>
+    const multi = b.items && b.items.length>1;
+    html += `<tr><td>${fmtDate(b.date)}</td><td>${b.customerName}</td><td>${b.itemDesc}${multi?` <span class="tag tag-gold">${b.items.length} items</span>`:''}</td><td>${b.metal}</td><td>${fmtWt(b.weight)}</td><td>${purity?purity+'%':'-'}</td><td>${fmtWt(pw)}</td><td>${fmtMoney(b.rateApplied)}</td><td>${fmtMoney(b.amount)}</td>
     <td><button class="btn btn-sm btn-ghost" onclick="printBuyingReceipt('${b.id}')">🖨</button>
     <button class="btn btn-sm btn-ghost" onclick="sharePdfBuying('${b.id}')">📄</button>
     <button class="btn btn-sm btn-ghost" onclick="guardEdit('purchase entry', ()=>openBuyForm('${b.id}'))">✎ Edit</button>
@@ -1876,82 +1974,115 @@ function deleteBuy(id){
     saveDB(); renderBuying(); toast('Purchase deleted');
   });
 }
+let buyDraftItems = [];
+function buyItemAmount(it){
+  const purity = (it.purity===undefined||it.purity==='') ? 100 : Number(it.purity);
+  const pw = (Number(it.weight)||0) * (purity/100);
+  return (pw*(Number(it.rate)||0)) + Number(it.making||0) + Number(it.labour||0);
+}
+function addBuyItemRow(){
+  buyDraftItems.push({itemDesc:'', metal:'Silver', weight:0, purity:100, rate: DB.currentRates.silverKg/1000, making:0, labour:0});
+  renderBuyItemRows();
+}
+function removeBuyItemRow(i){ buyDraftItems.splice(i,1); renderBuyItemRows(); recalcBuyTotals(); }
+function setBuyItemMetal(i, metal){
+  buyDraftItems[i].metal = metal;
+  buyDraftItems[i].rate = metal==='Gold' ? DB.currentRates.gold22/10 : DB.currentRates.silverKg/1000;
+  renderBuyItemRows(); recalcBuyTotals();
+}
+function renderBuyItemRows(){
+  const wrap = document.getElementById('buyItemsWrap'); if(!wrap) return;
+  wrap.innerHTML = buyDraftItems.map((it,i)=>{
+    const purity = (it.purity===undefined||it.purity==='')?100:it.purity;
+    const pureWt = (Number(it.weight)||0) * (Number(purity)||0)/100;
+    return `
+    <div class="itemRow" style="grid-template-columns:1.1fr 0.7fr 0.65fr 0.6fr 0.65fr 0.6fr 0.6fr 0.75fr auto;">
+      <div class="field"><label>Item Description</label><input value="${it.itemDesc}" placeholder="e.g. Old silver anklet" oninput="buyDraftItems[${i}].itemDesc=this.value"></div>
+      <div class="field"><label>${T('metal')}</label><select onchange="setBuyItemMetal(${i}, this.value)">
+        <option ${it.metal==='Silver'?'selected':''}>Silver</option>
+        <option ${it.metal==='Gold'?'selected':''}>Gold</option>
+      </select></div>
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" value="${it.weight}" oninput="buyDraftItems[${i}].weight=parseFloat(this.value)||0; recalcBuyTotals();"></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" step="0.1" value="${purity}" oninput="buyDraftItems[${i}].purity=parseFloat(this.value)||0; recalcBuyTotals();"></div>
+      <div class="field"><label>${T('rate')}/g</label><input type="number" value="${it.rate}" oninput="buyDraftItems[${i}].rate=parseFloat(this.value)||0; recalcBuyTotals();"></div>
+      <div class="field"><label>Making</label><input type="number" value="${it.making||0}" oninput="buyDraftItems[${i}].making=parseFloat(this.value)||0; recalcBuyTotals();"></div>
+      <div class="field"><label>Labour</label><input type="number" value="${it.labour||0}" oninput="buyDraftItems[${i}].labour=parseFloat(this.value)||0; recalcBuyTotals();"></div>
+      <div class="field"><label>Amount</label><input value="${fmtMoney(buyItemAmount(it))}" disabled style="background:var(--bg);color:var(--ink-soft);"></div>
+      <button class="miniRemove" onclick="removeBuyItemRow(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+function recalcBuyTotals(){
+  renderBuyItemRows();
+  let sub=0, wt=0;
+  buyDraftItems.forEach(it=>{ sub += buyItemAmount(it); wt += Number(it.weight)||0; });
+  const box = document.getElementById('buyTotalsBox'); if(!box) return;
+  box.innerHTML = `
+    <div class="totalsRow"><span>Total Weight</span><span>${fmtWt(wt)}</span></div>
+    <div class="totalsRow grand"><span>Total Amount Payable</span><span>${fmtMoney(sub)}</span></div>
+  `;
+}
 function openBuyForm(id){
   editingBuyId = id||null;
   const b = id ? DB.buying.find(x=>x.id===id) : null;
-  const purity = b ? ((b.purity===undefined||b.purity==='')?100:b.purity) : 100;
+  buyDraftItems = b ? (b.items||[]).map(it=>({...it})) : [];
   const body = `
     <div class="grid grid-2">
-      <div class="field"><label>${T('customer')} *</label><input list="custList2" id="buyCustomer" value="${b?b.customerName:''}">
-      <datalist id="custList2">${DB.customers.map(c=>`<option value="${c.name}">`).join('')}</datalist></div>
+      <div class="field"><label>${T('customer')} *</label><input id="buyCustomer" value="${b?b.customerName:''}"></div>
       <div class="field"><label>${T('phone')}</label><input id="buyPhone" value="${b?(DB.customers.find(c=>c.id===b.customerId)?.phone||''):''}"></div>
     </div>
     <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Item Description</label><input id="buyItemDesc" placeholder="Old silver anklet" value="${b?b.itemDesc:''}"></div>
-      <div class="field"><label>${T('metal')}</label><select id="buyMetal" onchange="buyAutoRate()"><option ${b&&b.metal==='Silver'?'selected':''}>Silver</option><option ${b&&b.metal==='Gold'?'selected':''}>Gold</option></select></div>
-    </div>
-    <div class="grid grid-3" style="margin-top:12px;">
-      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" id="buyWeight" value="${b?b.weight:''}" oninput="buyRecalc()"></div>
-      <div class="field"><label>${T('purity')} %</label><input type="number" step="0.1" id="buyPurity" placeholder="e.g. 90" value="${purity}" oninput="buyRecalc()"></div>
-      <div class="field"><label>${T('rate')}/g (pure)</label><input type="number" id="buyRate" value="${b?b.rateApplied:''}" oninput="buyRecalc()"></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>${T('date')}</label><input type="date" id="buyDate" value="${b?b.date:todayStr()}"></div>
+      <div class="field"><label>${T('date')}</label><input type="date" id="buyDate" value="${b?b.date:todayStr()}" max="${todayStr()}"></div>
       <div class="field"><label>Payment Mode</label><select id="buyPayMode"><option ${b&&b.paymentMode==='Cash'?'selected':''}>Cash</option><option ${b&&b.paymentMode==='UPI'?'selected':''}>UPI</option><option ${b&&b.paymentMode==='Adjust in Sale'?'selected':''}>Adjust in Sale</option></select></div>
     </div>
-    <div class="totalsBox">
-      <div class="totalsRow"><span>Pure Weight (wt × purity%)</span><span id="buyPureWtOut">0 g</span></div>
-      <div class="totalsRow grand"><span>Amount Payable</span><span id="buyAmountOut">₹0</span></div>
+    <div style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <label style="font-weight:600;font-size:13px;color:var(--ink-soft);">ITEMS BOUGHT</label>
+        <button class="btn btn-sm btn-outline" onclick="addBuyItemRow()">+ Add Item</button>
+      </div>
+      <div id="buyItemsWrap" style="margin-top:10px;"></div>
     </div>
-    <div class="helpText">Formula: weight × purity% = pure weight, then pure weight × rate = amount.</div>
+    <div class="totalsBox" id="buyTotalsBox" style="margin-top:14px;"></div>
+    <div class="helpText">Add as many items as were bought in this one purchase — each with its own weight, purity, and rate. Formula per item: weight × purity% × rate + making + labour.</div>
   `;
   openModal(id?'Edit Purchase':T('newPurchase'), body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:id?'Save Changes':T('save'), cls:'btn-primary', onClick:saveBuy}
   ]);
-  if(!b) buyAutoRate(); else buyRecalc();
+  if(buyDraftItems.length===0) addBuyItemRow(); else { renderBuyItemRows(); recalcBuyTotals(); }
   attachCustomerAutocomplete('buyCustomer','buyPhone');
-}
-function buyAutoRate(){
-  const metal = document.getElementById('buyMetal').value;
-  document.getElementById('buyRate').value = metal==='Gold' ? (DB.currentRates.gold22/10).toFixed(2) : (DB.currentRates.silverKg/1000).toFixed(2);
-  buyRecalc();
-}
-function buyRecalc(){
-  const w = parseFloat(document.getElementById('buyWeight').value)||0;
-  const purity = parseFloat(document.getElementById('buyPurity').value);
-  const p = (purity===undefined||isNaN(purity)) ? 100 : purity;
-  const r = parseFloat(document.getElementById('buyRate').value)||0;
-  const pw = w*(p/100);
-  document.getElementById('buyPureWtOut').textContent = fmtWt(pw);
-  document.getElementById('buyAmountOut').textContent = fmtMoney(pw*r);
 }
 function saveBuy(){
   const name = document.getElementById('buyCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
+  if(buyDraftItems.length===0 || buyDraftItems.every(i=>!i.itemDesc)){ toast('Add at least one item'); return; }
   const cust = resolveCustomer('buyCustomer','buyPhone');
-  const weight = parseFloat(document.getElementById('buyWeight').value)||0;
-  const purityRaw = parseFloat(document.getElementById('buyPurity').value);
-  const purity = (purityRaw===undefined||isNaN(purityRaw)) ? 100 : purityRaw;
-  const rate = parseFloat(document.getElementById('buyRate').value)||0;
-  const pureWeight = weight*(purity/100);
   const date = document.getElementById('buyDate').value || todayStr();
+  const payMode = document.getElementById('buyPayMode').value;
+  const items = buyDraftItems.filter(i=>i.itemDesc).map(i=>({...i, amount: buyItemAmount(i)}));
+  const totalWeight = items.reduce((a,i)=>a+(Number(i.weight)||0),0);
+  const totalAmount = items.reduce((a,i)=>a+i.amount,0);
+  const totalMaking = items.reduce((a,i)=>a+(Number(i.making)||0),0);
+  const totalLabour = items.reduce((a,i)=>a+(Number(i.labour)||0),0);
+  const metals = [...new Set(items.map(i=>i.metal))];
+  const aggregate = {
+    itemDesc: items.map(i=>i.itemDesc).join(', '),
+    metal: metals.length===1 ? metals[0] : 'Mixed',
+    purity: items.length===1 ? items[0].purity : '',
+    weight: totalWeight,
+    rateApplied: items.length===1 ? items[0].rate : 0,
+    amount: totalAmount, making: totalMaking, labour: totalLabour
+  };
   if(editingBuyId){
     const b = DB.buying.find(x=>x.id===editingBuyId);
-    b.customerId=cust.id; b.customerName=cust.name; b.itemDesc=document.getElementById('buyItemDesc').value;
-    b.metal=document.getElementById('buyMetal').value; b.purity=purity; b.weight=weight; b.rateApplied=rate;
-    b.amount=pureWeight*rate; b.date=date; b.paymentMode=document.getElementById('buyPayMode').value;
-    logHistory('Buying','Edited', `Purchase from ${cust.name} edited — ${fmtMoney(b.amount)}`);
+    b.customerId=cust.id; b.customerName=cust.name; b.date=date; b.paymentMode=payMode;
+    b.items = items; Object.assign(b, aggregate);
+    logHistory('Buying','Edited', `Purchase from ${cust.name} edited — ${items.length} item(s), ${fmtMoney(b.amount)}`);
     saveDB(); closeModal(); toast('Purchase updated'); renderBuying();
   } else {
-    const b = {
-      id: uid('BUY'), date, createdAt: nowISO(), customerId:cust.id, customerName:cust.name,
-      itemDesc: document.getElementById('buyItemDesc').value, metal: document.getElementById('buyMetal').value,
-      purity, weight, rateApplied: rate, amount: pureWeight*rate,
-      paymentMode: document.getElementById('buyPayMode').value
-    };
+    const b = { id: uid('BUY'), date, createdAt: nowISO(), customerId:cust.id, customerName:cust.name, paymentMode:payMode, items, ...aggregate };
     DB.buying.push(b);
-    logHistory('Buying','Created', `Bought ${b.itemDesc} from ${cust.name} — ${fmtMoney(b.amount)}`);
+    logHistory('Buying','Created', `Bought ${items.length} item(s) from ${cust.name} — ${fmtMoney(b.amount)}`);
     saveDB(); closeModal(); toast('Purchase saved'); renderBuying();
   }
 }
@@ -3480,6 +3611,7 @@ function customerLastVisit(id){
 function viewCustomerLedger(id){
   const c = DB.customers.find(x=>x.id===id); if(!c) return;
   const sales = DB.sales.filter(s=>s.customerId===id && !s.deleted);
+  const buying = DB.buying.filter(b=>b.customerId===id && !b.deleted);
   const girvi = DB.girvi.filter(g=>g.customerId===id && !g.deleted);
   const credit = DB.creditEntries.filter(e=>e.customerId===id && !e.deleted);
   const jobs = DB.jobs.filter(j=>j.customerId===id && !j.deleted);
@@ -3489,6 +3621,7 @@ function viewCustomerLedger(id){
 
   let timeline = [];
   sales.forEach(s=>timeline.push({date:s.date, ts:s.createdAt, icon:'🧾', text:`Sale ${s.billNo} — ${fmtMoney(s.grandTotal)}`}));
+  buying.forEach(b=>timeline.push({date:b.date, ts:b.createdAt, icon:'⚖️', text:`Purchase from them — ${b.itemDesc||'item'} — ${fmtMoney(b.amount)}`}));
   girvi.forEach(g=>timeline.push({date:g.date, ts:g.createdAt, icon:'🔐', text:`Girvi loan — ${g.itemDesc} — ${fmtMoney(g.loanAmount)} (${g.status})`}));
   credit.forEach(e=>timeline.push({date:e.date, ts:e.createdAt, icon:'📒', text:`${e.type==='debit'?'Udhaar given':'Payment received'} — ${fmtMoney(e.amount)}${e.description?' — '+e.description:''}`}));
   jobs.forEach(j=>timeline.push({date:j.date, ts:j.createdAt, icon:'🛠️', text:`${j.type} job — ${j.itemDesc} (${j.status})`}));
@@ -3507,8 +3640,9 @@ function viewCustomerLedger(id){
       ${c.referredBy?`🤝 <b>Referred by:</b> ${c.referredBy}<br>`:''}${c.familyLink?`👪 <b>Family / relation:</b> ${c.familyLink}`:''}
     </div>`:''}
     ${c.notes?`<div class="helpText" style="margin-bottom:12px;">📝 ${c.notes}</div>`:''}
-    <div class="statGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+    <div class="statGrid" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">
       <div class="statCard" style="padding:12px;"><div class="lbl">Sales</div><div class="val" style="font-size:20px;">${sales.length}</div></div>
+      <div class="statCard" style="padding:12px;border-color:var(--gold)"><div class="lbl">Purchases</div><div class="val" style="font-size:20px;">${buying.length}</div></div>
       <div class="statCard" style="padding:12px;border-color:var(--silver-accent)"><div class="lbl">Girvi</div><div class="val" style="font-size:20px;">${girvi.length}</div></div>
       <div class="statCard" style="padding:12px;border-color:var(--danger)"><div class="lbl">Credit</div><div class="val" style="font-size:20px;">${credit.length}</div></div>
       <div class="statCard" style="padding:12px;border-color:var(--success)"><div class="lbl">Jobs</div><div class="val" style="font-size:20px;">${jobs.length}</div></div>
@@ -3742,7 +3876,8 @@ function renderReports(){
     <tr><td>Active Girvi Loans</td><td>${fmtMoney(activeGirviList.reduce((a,g)=>a+(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount),0))}</td></tr>
     <tr><td>Pending Jobs</td><td>${DB.jobs.filter(j=>j.status!=='delivered' && !j.deleted).length}</td></tr>
     <tr><td>Items In Stock</td><td>${stockItems.length}</td></tr>
-    <tr><td>Silver Owed to Wholesalers</td><td>${fmtWt(DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>a+Math.max(wholesalerBalance(w.id).silverOwed,0),0))}</td></tr></table></div>`;
+    <tr><td>Silver Owed to Wholesalers</td><td>${fmtWt(DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>a+Math.max(wholesalerBalance(w.id).silverOwed,0),0))}</td></tr>
+    <tr><td>Gold Fine Owed to Wholesalers</td><td>${fmtWt(DB.wholesalers.filter(w=>!w.deleted).reduce((a,w)=>a+Math.max(wholesalerBalance(w.id).goldOwed,0),0))}</td></tr></table></div>`;
 
   html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Inventory Valuation (at today's rates)</h3>
     <table><tr><td>Total Stock Value</td><td><b>${fmtMoney(stockValue)}</b></td></tr>
@@ -4008,11 +4143,12 @@ function deleteTodo(id){
 function wholesalerBalance(wholesalerId){
   let silverOwed=0, goldOwed=0, cashOwed=0;
   DB.wholesalerEntries.filter(e=>e.wholesalerId===wholesalerId && !e.deleted).forEach(e=>{
+    const isGold = String(e.metal||'').trim().toLowerCase()==='gold';
     if(e.type==='purchase'){
-      if(e.metal==='Gold') goldOwed += e.pureWeight; else silverOwed += e.pureWeight;
+      if(isGold) goldOwed += e.pureWeight; else silverOwed += e.pureWeight;
       cashOwed += Number(e.labourCharge||0);
     } else {
-      if(e.metal==='Gold') goldOwed -= e.pureWeight; else silverOwed -= e.pureWeight;
+      if(isGold) goldOwed -= e.pureWeight; else silverOwed -= e.pureWeight;
       cashOwed -= Number(e.cashPaid||0);
     }
   });
@@ -4024,10 +4160,11 @@ function renderWholesaler(){
   if(activeWholesalers.length===0){
     html += `<div class="card"><div class="empty"><div class="big">📇</div>No wholesalers added yet. Add Hiraraja Jamnalal or your other suppliers to start their kata.</div></div>`;
   } else {
-    const totals = activeWholesalers.reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,cash:0});
-    html += `<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">
+    const totals = activeWholesalers.reduce((a,w)=>{ const b=wholesalerBalance(w.id); a.silver+=Math.max(b.silverOwed,0); a.gold+=Math.max(b.goldOwed,0); a.cash+=Math.max(b.cashOwed,0); return a; }, {silver:0,gold:0,cash:0});
+    html += `<div class="statGrid" style="grid-template-columns:repeat(4,1fr);">
       <div class="statCard"><div class="lbl">Total Wholesalers</div><div class="val">${activeWholesalers.length}</div></div>
       <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Total Silver Owed</div><div class="val">${fmtWt(totals.silver)}</div></div>
+      <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Total Gold Fine Owed</div><div class="val">${fmtWt(totals.gold)}</div></div>
       <div class="statCard" style="border-color:var(--danger)"><div class="lbl">Total Cash/Labour Owed</div><div class="val">${fmtMoney(totals.cash)}</div></div>
     </div>`;
     html += `<div class="grid grid-3">`;
@@ -4042,8 +4179,8 @@ function renderWholesaler(){
           </div>
         </div>
         <div class="helpText">${w.phone||''}</div>
-        <div class="wsBalRow"><span>Silver: <b>${fmtWt(bal.silverOwed)}</b></span></div>
-        <div class="wsBalRow"><span>Gold: <b>${fmtWt(bal.goldOwed)}</b></span><span>Cash/Labour: <b>${fmtMoney(bal.cashOwed)}</b></span></div>
+        <div class="wsBalRow"><span>Silver Owed: <b>${fmtWt(bal.silverOwed)}</b></span></div>
+        <div class="wsBalRow"><span>Gold Fine Owed: <b>${fmtWt(bal.goldOwed)}</b></span><span>Cash/Labour: <b>${fmtMoney(bal.cashOwed)}</b></span></div>
         <button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="viewWholesalerKata('${w.id}')">Open Kata</button>
       </div>`;
     });
@@ -4102,9 +4239,77 @@ function viewWholesalerKata(id){
     {label:'+ Payment Entry', cls:'btn-primary', onClick:()=>{ closeModal(); openWholesalerEntryForm(id,'payment'); }}
   ]);
 }
+let weDraftItems = [];
+function weItemAmount(it){
+  const purity = (it.purity===undefined||it.purity==='') ? 100 : Number(it.purity);
+  return (Number(it.weight)||0) * (purity/100);
+}
+function addWeItemRow(){
+  weDraftItems.push({itemDesc:'', metal:'Silver', weight:0, purity:100, labourCharge:0});
+  renderWeItemRows();
+}
+function removeWeItemRow(i){ weDraftItems.splice(i,1); renderWeItemRows(); recalcWeTotals(); }
+function renderWeItemRows(){
+  const wrap = document.getElementById('weItemsWrap'); if(!wrap) return;
+  wrap.innerHTML = weDraftItems.map((it,i)=>{
+    const purity = (it.purity===undefined||it.purity==='')?100:it.purity;
+    const pureWt = (Number(it.weight)||0) * (Number(purity)||0)/100;
+    return `
+    <div class="itemRow" style="grid-template-columns:1.1fr 0.7fr 0.65fr 0.65fr 0.7fr 0.75fr auto;">
+      <div class="field"><label>Item Description</label><input value="${it.itemDesc}" placeholder="e.g. Raw silver bars" oninput="weDraftItems[${i}].itemDesc=this.value"></div>
+      <div class="field"><label>${T('metal')}</label><select onchange="weDraftItems[${i}].metal=this.value; recalcWeTotals();">
+        <option ${it.metal==='Silver'?'selected':''}>Silver</option>
+        <option ${it.metal==='Gold'?'selected':''}>Gold</option>
+      </select></div>
+      <div class="field"><label>${T('purity')} %</label><input type="number" step="0.1" value="${purity}" oninput="weDraftItems[${i}].purity=parseFloat(this.value)||0; recalcWeTotals();"></div>
+      <div class="field"><label>${T('weight')}</label><input type="number" step="0.001" value="${it.weight}" oninput="weDraftItems[${i}].weight=parseFloat(this.value)||0; recalcWeTotals();"></div>
+      <div class="field"><label>Labour (₹)</label><input type="number" value="${it.labourCharge||0}" oninput="weDraftItems[${i}].labourCharge=parseFloat(this.value)||0; recalcWeTotals();"></div>
+      <div class="field"><label>Pure Wt</label><input value="${fmtWt(pureWt)}" disabled style="background:var(--bg);color:var(--ink-soft);"></div>
+      <button class="miniRemove" onclick="removeWeItemRow(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+function recalcWeTotals(){
+  renderWeItemRows();
+  const box = document.getElementById('weTotalsBox'); if(!box) return;
+  let silverPure=0, goldPure=0, labour=0;
+  weDraftItems.forEach(it=>{
+    const pw = weItemAmount(it);
+    if(it.metal==='Gold') goldPure += pw; else silverPure += pw;
+    labour += Number(it.labourCharge)||0;
+  });
+  box.innerHTML = `
+    <div class="totalsRow"><span>Total Pure Silver</span><span>${fmtWt(silverPure)}</span></div>
+    <div class="totalsRow"><span>Total Pure Gold</span><span>${fmtWt(goldPure)}</span></div>
+    <div class="totalsRow grand"><span>Total Labour Owed</span><span>${fmtMoney(labour)}</span></div>
+  `;
+}
 function openWholesalerEntryForm(wholesalerId, type, editId){
   const isPurchase = type==='purchase';
   const e = editId ? DB.wholesalerEntries.find(x=>x.id===editId) : null;
+  if(isPurchase && !editId){
+    // New purchase entry: multi-item flow, one or more items in a single go.
+    weDraftItems = [];
+    const body = `
+      <div class="field"><label>Date</label><input type="date" id="weDate" value="${todayStr()}" max="${todayStr()}"></div>
+      <div style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <label style="font-weight:600;font-size:13px;color:var(--ink-soft);">ITEMS PURCHASED</label>
+          <button class="btn btn-sm btn-outline" onclick="addWeItemRow()">+ Add Item</button>
+        </div>
+        <div id="weItemsWrap" style="margin-top:10px;"></div>
+      </div>
+      <div class="totalsBox" id="weTotalsBox" style="margin-top:14px;"></div>
+      <div class="field" style="margin-top:12px;"><label>Note (applies to all items)</label><input id="weNote"></div>
+      <div class="helpText">Add as many items as were bought from this wholesaler in one go — silver and gold can be mixed in the same entry.</div>
+    `;
+    openModal('Wholesaler Purchase Entry', body, [
+      {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+      {label:T('save'), cls:'btn-primary', onClick:()=>saveWholesalerEntryMulti(wholesalerId)}
+    ]);
+    addWeItemRow();
+    return;
+  }
   const body = `
     <div class="grid grid-2">
       <div class="field"><label>Date</label><input type="date" id="weDate" value="${e?e.date:todayStr()}" max="${todayStr()}"></div>
@@ -4125,6 +4330,24 @@ function openWholesalerEntryForm(wholesalerId, type, editId){
     {label:e?'Save Changes':T('save'), cls:'btn-primary', onClick:()=>saveWholesalerEntry(wholesalerId,type,editId)}
   ]);
   weRecalc();
+}
+function saveWholesalerEntryMulti(wholesalerId){
+  const items = weDraftItems.filter(i=>i.itemDesc && Number(i.weight)>0);
+  if(items.length===0){ toast('Add at least one item with a description and weight'); return; }
+  const date = document.getElementById('weDate').value || todayStr();
+  const note = document.getElementById('weNote').value || '';
+  const w = DB.wholesalers.find(x=>x.id===wholesalerId);
+  items.forEach(it=>{
+    const purity = (it.purity===undefined||it.purity==='') ? 100 : Number(it.purity);
+    DB.wholesalerEntries.push({
+      id: uid('WE'), wholesalerId, date, createdAt: nowISO(), type:'purchase',
+      metal: it.metal, purity, weight: Number(it.weight)||0, pureWeight: weItemAmount(it),
+      itemDesc: it.itemDesc, labourCharge: Number(it.labourCharge)||0, cashPaid: 0, note
+    });
+  });
+  const totalPure = items.reduce((a,i)=>a+weItemAmount(i),0);
+  logHistory('Wholesaler','purchase', `${items.length} item(s) purchased from ${w?w.name:''} — total pure ${fmtWt(totalPure)}`);
+  saveDB(); closeModal(); toast(items.length+' item(s) saved'); renderWholesaler();
 }
 function weRecalc(){
   const w = parseFloat(document.getElementById('weWeight')?.value)||0;
@@ -4436,6 +4659,11 @@ function renderSettings(){
       <div class="helpText" style="margin-top:8px;">Last backup: ${DB.meta.lastBackupAt?fmtDate(DB.meta.lastBackupAt):'Never'}</div>
     </div>
     <div class="card">
+      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">📊 Storage & Data Health</h3>
+      <p class="helpText">Use this to self-check that this is the same app/data you've always been using — especially useful if you're ever unsure whether entries are missing.</p>
+      <div id="storageHealthWrap"></div>
+    </div>
+    <div class="card">
       <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Language</h3>
       <div style="display:flex;gap:10px;">
         <button class="btn ${DB.meta.language==='en'?'btn-primary':'btn-ghost'}" onclick="setLanguage('en')">English</button>
@@ -4444,6 +4672,32 @@ function renderSettings(){
     </div>
   </div>`;
   document.getElementById('content').innerHTML = html;
+  renderStorageHealth();
+}
+function renderStorageHealth(){
+  const wrap = document.getElementById('storageHealthWrap'); if(!wrap) return;
+  const counts = computeRecordCounts();
+  const sizeBytes = new Blob([JSON.stringify(DB)]).size;
+  const sizeKB = Math.round(sizeBytes/1024);
+  let html = `<table>
+    <tr><th>Module</th><th>Records</th></tr>
+    <tr><td>Girvi</td><td>${counts.Girvi}</td></tr>
+    <tr><td>Sales</td><td>${counts.Sales}</td></tr>
+    <tr><td>Customers</td><td>${counts.Customers}</td></tr>
+    <tr><td>Purchases (Buying)</td><td>${counts.Buying}</td></tr>
+    <tr><td>Credit Entries</td><td>${counts.Credit}</td></tr>
+  </table>
+  <div class="helpText" style="margin-top:10px;">App data size: <b>${sizeKB} KB</b> (typical device limit is a few MB — mostly used up by photos).</div>
+  <div class="helpText">Snapshot last taken: ${DB.meta.recordCountSnapshotAt?new Date(DB.meta.recordCountSnapshotAt).toLocaleString('en-IN'):'Not yet'} — this is what new-session comparisons use to warn you about a possible mismatch.</div>
+  <div id="storageQuotaOut" class="helpText" style="margin-top:4px;"></div>`;
+  wrap.innerHTML = html;
+  if(navigator.storage && navigator.storage.estimate){
+    navigator.storage.estimate().then(function(est){
+      const out = document.getElementById('storageQuotaOut'); if(!out) return;
+      const usedMB = (est.usage/1024/1024).toFixed(2), quotaMB = (est.quota/1024/1024).toFixed(0);
+      out.textContent = 'Browser-reported storage: '+usedMB+' MB used of ~'+quotaMB+' MB available on this device.';
+    }).catch(function(){});
+  }
 }
 function saveShopInfo(){
   DB.meta.shopName = document.getElementById('setShopName').value;
@@ -4601,10 +4855,42 @@ function updateClock(){
   const timeStr = now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   el.textContent = dateStr + '  •  ' + timeStr;
 }
+/* Safety net against the single biggest real risk in a localStorage-only
+   app: silently opening a different copy/origin of the app than usual
+   (e.g. a stale Home Screen icon pointing at an older downloaded file).
+   If key record counts look SMALLER than last time this app was opened,
+   warn loudly before the person keeps working on what might be the
+   wrong data store. */
+function computeRecordCounts(){
+  return {
+    Girvi: DB.girvi.filter(g=>!g.deleted).length,
+    Sales: DB.sales.filter(s=>!s.deleted).length,
+    Customers: DB.customers.filter(c=>!c.mergedInto).length,
+    Buying: DB.buying.filter(b=>!b.deleted).length,
+    Credit: DB.creditEntries.filter(e=>!e.deleted).length
+  };
+}
+function checkRecordCountDrop(){
+  const current = computeRecordCounts();
+  const prev = DB.meta.recordCountSnapshot;
+  window._countDropWarning = null;
+  if(prev){
+    const drops = [];
+    Object.keys(current).forEach(k=>{
+      if(prev[k]!==undefined && current[k] < prev[k]) drops.push(k+': '+prev[k]+' \u2192 '+current[k]);
+    });
+    if(drops.length) window._countDropWarning = drops.join(', ');
+  }
+  DB.meta.recordCountSnapshot = current;
+  DB.meta.recordCountSnapshotAt = nowISO();
+  saveDB();
+}
+function dismissCountDropWarning(){ window._countDropWarning = null; renderDashboard(); }
 function init(){
   document.getElementById('brandName').textContent = DB.meta.shopName;
   document.getElementById('brandLoc').textContent = DB.meta.location.split(',')[0].toUpperCase()+', '+ (DB.meta.location.split(',')[1]||'').toUpperCase();
   renderNav(); renderRateStrip(); syncLangToggle();
+  checkRecordCountDrop();
   goTo('dashboard');
   updateClock();
   if(!window._clockInterval) window._clockInterval = setInterval(updateClock, 30000);
