@@ -484,21 +484,99 @@ function migrateDB(d){
   (d.exchange||[]).forEach(e=>{ if(e.linkedInventoryId===undefined) e.linkedInventoryId=null; });
   return d;
 }
-let DB = loadDB();
-function loadDB(){
+/* =====================================================================
+   STORAGE ENGINE — IndexedDB, not localStorage.
+   Why: Safari caps localStorage at ~5-10MB regardless of device free
+   space, which is what was causing "device storage is full" errors and
+   silently-failed saves even on a mostly-empty iPad. IndexedDB draws
+   from the device's real free space (often GBs) and is fully supported
+   offline in Safari on iPad. DB itself stays a plain synchronous
+   in-memory object exactly as before — every other part of the app
+   reads/writes DB directly with zero changes. Only this storage layer
+   changed.
+===================================================================== */
+const IDB_NAME = 'gj_erp_idb_v1';
+const IDB_STORE = 'kv';
+const IDB_ROW_KEY = 'db';
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    if(!window.indexedDB){ reject(new Error('IndexedDB not available in this browser')); return; }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = (e)=>{ const db=e.target.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); };
+    req.onsuccess = (e)=> resolve(e.target.result);
+    req.onerror = (e)=> reject(e.target.error||new Error('IndexedDB open failed'));
+  });
+}
+async function idbGet(){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_ROW_KEY);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error||new Error('IndexedDB read failed'));
+  });
+}
+async function idbSet(value){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(value, IDB_ROW_KEY);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error||new Error('IndexedDB write failed'));
+  });
+}
+let DB = defaultDB(); // real data is loaded asynchronously by boot() below before the PIN pad appears
+async function loadDB(){
   try{
-    const raw = localStorage.getItem(DB_KEY);
-    if(!raw) { const d=defaultDB(); localStorage.setItem(DB_KEY, JSON.stringify(d)); return d; }
-    return migrateDB(JSON.parse(raw));
-  }catch(e){ return defaultDB(); }
+    let data = await idbGet();
+    if(!data){
+      // First run on this device after the storage-engine upgrade: migrate
+      // any pre-existing localStorage data into IndexedDB. The old
+      // localStorage copy is deliberately left untouched afterward as a
+      // silent emergency fallback — never deleted, never relied upon again.
+      const raw = localStorage.getItem(DB_KEY);
+      if(raw){
+        try{ data = JSON.parse(raw); }catch(e2){ data = null; }
+      }
+      if(!data) data = defaultDB();
+      await idbSet(data);
+    }
+    return migrateDB(data);
+  }catch(e){
+    // IndexedDB unavailable for some reason — fall back to the old
+    // localStorage behaviour rather than losing access to the app entirely.
+    try{
+      const raw = localStorage.getItem(DB_KEY);
+      if(raw) return migrateDB(JSON.parse(raw));
+    }catch(e2){}
+    return defaultDB();
+  }
+}
+let _idbSaveInFlight = false, _idbSavePending = false, _idbLastError = null;
+async function flushIdbSaveQueue(){
+  if(_idbSaveInFlight) return;
+  _idbSaveInFlight = true;
+  while(_idbSavePending){
+    _idbSavePending = false;
+    const snapshot = JSON.parse(JSON.stringify(DB));
+    try{
+      await idbSet(snapshot);
+      _idbLastError = null;
+    }catch(err){
+      _idbLastError = err;
+      toast('⚠️ Could not save: '+(err&&err.message?err.message:'storage error')+'. Please back up soon.');
+    }
+  }
+  _idbSaveInFlight = false;
 }
 function saveDB(){
   try{
-    localStorage.setItem(DB_KEY, JSON.stringify(DB));
     renderRateStrip();
+    _idbSavePending = true;
+    flushIdbSaveQueue();
     return true;
   }catch(err){
-    toast('⚠️ Could not save — device storage is full. Please back up and free up space.');
+    toast('⚠️ Could not save: '+(err&&err.message?err.message:'unknown error'));
     return false;
   }
 }
@@ -2222,6 +2300,49 @@ function compressImageFile(file, maxDim, quality, onDone, onError){
   };
   reader.onerror = function(){ toast('Could not read this file'); if(onError) onError(); };
   reader.readAsDataURL(file);
+}
+/* Re-compress an already-stored dataURL photo down further (used by the
+   "Free Up Space" tool). Promise-based sibling of compressImageFile. */
+function recompressDataUrl(dataUrl, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    if(!dataUrl || typeof dataUrl!=='string' || !dataUrl.startsWith('data:image')){ resolve(dataUrl); return; }
+    const img = new Image();
+    img.onload = function(){
+      let w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = Math.round(h * (maxDim/w)); w = maxDim; }
+      else if(h >= w && h > maxDim){ w = Math.round(w * (maxDim/h)); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      try{ resolve(canvas.toDataURL('image/jpeg', quality)); }
+      catch(err){ reject(err); }
+    };
+    img.onerror = function(){ reject(new Error('could not decode image')); };
+    img.src = dataUrl;
+  });
+}
+async function freeUpSpace(){
+  toast('Shrinking stored photos…');
+  const sizeBefore = new Blob([JSON.stringify(DB)]).size;
+  const jobs = [];
+  DB.customers.forEach(c=>{
+    if(c.photo) jobs.push(recompressDataUrl(c.photo,200,0.5).then(v=>{ c.photo=v; }));
+    if(Array.isArray(c.photos) && c.photos.length){
+      jobs.push(Promise.all(c.photos.map(p=>recompressDataUrl(p,200,0.5))).then(arr=>{ c.photos=arr; }));
+    }
+  });
+  DB.girvi.forEach(g=>{ if(g.photo) jobs.push(recompressDataUrl(g.photo,200,0.5).then(v=>{ g.photo=v; })); });
+  DB.inventory.forEach(i=>{
+    if(Array.isArray(i.photos) && i.photos.length){
+      jobs.push(Promise.all(i.photos.map(p=>recompressDataUrl(p,200,0.5))).then(arr=>{ i.photos=arr; }));
+    }
+  });
+  try{ await Promise.all(jobs); }catch(e){ /* keep whatever succeeded */ }
+  const sizeAfter = new Blob([JSON.stringify(DB)]).size;
+  const savedKB = Math.max(0, Math.round((sizeBefore-sizeAfter)/1024));
+  logHistory('Settings','Free Up Space', `Recompressed all stored photos, freed ~${savedKB} KB`);
+  saveDB(); renderStorageHealth();
+  toast('Done — freed about '+savedKB+' KB');
 }
 function handleGirviPhoto(e){
   const file = e.target.files[0]; if(!file) return;
@@ -4687,15 +4808,16 @@ function renderStorageHealth(){
     <tr><td>Purchases (Buying)</td><td>${counts.Buying}</td></tr>
     <tr><td>Credit Entries</td><td>${counts.Credit}</td></tr>
   </table>
-  <div class="helpText" style="margin-top:10px;">App data size: <b>${sizeKB} KB</b> (typical device limit is a few MB — mostly used up by photos).</div>
-  <div class="helpText">Snapshot last taken: ${DB.meta.recordCountSnapshotAt?new Date(DB.meta.recordCountSnapshotAt).toLocaleString('en-IN'):'Not yet'} — this is what new-session comparisons use to warn you about a possible mismatch.</div>
-  <div id="storageQuotaOut" class="helpText" style="margin-top:4px;"></div>`;
+  <div class="helpText" style="margin-top:10px;">App data size: <b>${sizeKB} KB</b> — mostly photos. Stored using IndexedDB, which draws from your device's real free space, not a small fixed browser limit.</div>
+  <div class="helpText">Snapshot last taken: ${DB.meta.recordCountSnapshotAt?new Date(DB.meta.recordCountSnapshotAt).toLocaleString('en-IN'):'Not yet'} — used to warn you if record counts ever look smaller than last time (a sign you may have opened a different copy of the app).</div>
+  <div id="storageQuotaOut" class="helpText" style="margin-top:4px;"></div>
+  <button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="freeUpSpace()">🗜 Free Up Space (shrink stored photos)</button>`;
   wrap.innerHTML = html;
   if(navigator.storage && navigator.storage.estimate){
     navigator.storage.estimate().then(function(est){
       const out = document.getElementById('storageQuotaOut'); if(!out) return;
       const usedMB = (est.usage/1024/1024).toFixed(2), quotaMB = (est.quota/1024/1024).toFixed(0);
-      out.textContent = 'Browser-reported storage: '+usedMB+' MB used of ~'+quotaMB+' MB available on this device.';
+      out.textContent = 'Actual device storage in use: '+usedMB+' MB of ~'+quotaMB+' MB available — this now correctly reflects real usage.';
     }).catch(function(){});
   }
 }
@@ -4756,9 +4878,17 @@ document.getElementById('restoreFileInput').addEventListener('change', function(
   const reader = new FileReader();
   reader.onload = function(evt){
     try{
-      const data = JSON.parse(evt.target.result);
-      confirmAction('Restoring will replace ALL current data on this tablet with the backup file. Continue?', ()=>{
-        DB = data; saveDB(); location.reload();
+      const data = migrateDB(JSON.parse(evt.target.result));
+      confirmAction('Restoring will replace ALL current data on this tablet with the backup file. Continue?', async ()=>{
+        toast('Restoring…');
+        try{
+          await idbSet(data);
+          DB = data;
+          toast('Restore complete — reloading…');
+          setTimeout(()=>location.reload(), 600);
+        }catch(err){
+          toast('⚠️ Restore failed: '+(err&&err.message?err.message:'storage error')+'. Your current data was NOT changed.');
+        }
       });
     }catch(err){ toast('Invalid backup file'); }
   };
@@ -4895,8 +5025,21 @@ function init(){
   updateClock();
   if(!window._clockInterval) window._clockInterval = setInterval(updateClock, 30000);
 }
-document.getElementById('lockTitle').textContent = DB.meta.shopName;
-renderPinPad();
+document.getElementById('lockHint').textContent = 'Loading your shop data…';
+document.getElementById('padGrid').style.opacity = '0.35';
+document.getElementById('padGrid').style.pointerEvents = 'none';
+window._bootPromise = (async function boot(){
+  try{
+    DB = await loadDB();
+  }catch(e){
+    DB = defaultDB();
+  }
+  document.getElementById('lockTitle').textContent = DB.meta.shopName;
+  document.getElementById('lockHint').textContent = 'Default PIN: 1234 — change it from Settings after login';
+  document.getElementById('padGrid').style.opacity = '1';
+  document.getElementById('padGrid').style.pointerEvents = 'auto';
+  renderPinPad();
+})();
 </script>
 </body>
 </html>
