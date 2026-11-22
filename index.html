@@ -304,6 +304,14 @@ tr:hover td{background:#FBF8F1;}
 .vlCard{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);}
 .vlCard.link{background:var(--warn-bg);border-radius:8px;padding:12px 10px;}
 @media print{.vlWrap{display:none !important;}}
+.cpParts{margin-top:4px;}
+.partChip{display:inline-block;background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:14px;padding:2px 10px;font-size:12px;margin:3px 5px 0 0;color:var(--maroon-dark);}
+.giCard{border:1px solid var(--gold-light);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#FFFCF5;}
+.giHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--maroon-dark);}
+.giGrid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;}
+.giPhoto{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;}
+.phoneAfter{font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--ink-soft);}
+@media(max-width:700px){.giGrid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -375,7 +383,7 @@ tr:hover td{background:#FBF8F1;}
 <script>
 /* =====================================================================
    GAYATRI JEWELLERS — OFFLINE SHOP MANAGER
-   Single-file offline ERP. All data in localStorage. No network calls.
+   Single-file offline ERP. All data in IndexedDB (permanent browser database). No network calls except optional live rates.
 ===================================================================== */
 
 const DB_KEY = 'gj_erp_db_v1';
@@ -554,6 +562,10 @@ function migrateDB(d){
     if(!Array.isArray(c.aliases)) c.aliases=[];
     if(!Array.isArray(c.photoHistory)) c.photoHistory=[];
     if(!Array.isArray(c.noteLog)) c.noteLog=[];
+    if(c.father===undefined) c.father='';
+    if(c.caste===undefined) c.caste='';
+    const NP=parseNameParts(c.name);
+    if(NP.hasSep){ if(!c.father) c.father=NP.father; if(!c.caste) c.caste=NP.caste; if(!c.village && NP.village) c.village=NP.village; }
   });
   (d.girvi||[]).forEach(g=>{
     if(g.bagColor===undefined) g.bagColor='';
@@ -577,12 +589,14 @@ function migrateDB(d){
 const IDB_NAME = 'gj_erp_idb_v1';
 const IDB_STORE = 'kv';
 const IDB_ROW_KEY = 'db';
+let _idbConn = null;   // one shared connection: a save starts its transaction immediately
 function idbOpen(){
+  if(_idbConn) return Promise.resolve(_idbConn);
   return new Promise((resolve, reject)=>{
     if(!window.indexedDB){ reject(new Error('IndexedDB not available in this browser')); return; }
     const req = indexedDB.open(IDB_NAME, 1);
     req.onupgradeneeded = (e)=>{ const db=e.target.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); };
-    req.onsuccess = (e)=> resolve(e.target.result);
+    req.onsuccess = (e)=>{ const db=e.target.result; db.onversionchange=()=>{ try{ db.close(); }catch(x){} _idbConn=null; }; db.onclose=()=>{ _idbConn=null; }; _idbConn=db; resolve(db); };
     req.onerror = (e)=> reject(e.target.error||new Error('IndexedDB open failed'));
   });
 }
@@ -605,45 +619,104 @@ async function idbSet(value){
   });
 }
 let DB = defaultDB(); // real data is loaded asynchronously by boot() below before the PIN pad appears
+/* =====================================================================
+   DATA SAFETY LAYER (on top of the IndexedDB engine above)
+   1. Guarded writes: a save is refused if the stored data was changed by another
+      window/tab (it would overwrite their work) or if it would replace real
+      records with an empty database. Saving pauses and a red banner explains.
+   2. If the saved data cannot be READ, the app never saves over it.
+   3. Daily safety copies (newest 3 days) plus a copy made just before an upgrade
+      or a restore - kept in the same browser database, restorable from Settings.
+   4. Asks the browser for "persistent" storage so it is not cleaned up automatically.
+   5. A pending change is flushed when the tab is hidden/closed; failed saves retry.
+===================================================================== */
+const SNAP_PREFIX = 'snap:';
+let _storageRev = 0, _storageLocked = false, _storageLockReason = '', _lastSavedAt = null, _idbRetry = 0;
+let _idbSaveInFlight = false, _idbSavePending = false, _idbLastError = null;
+function recordTotal(d){ return ['customers','sales','buying','girvi','creditEntries','inventory','jobs','exchange'].reduce((a,k)=>a+((d&&Array.isArray(d[k]))?d[k].length:0),0); }
+function countsOf(d){
+  const n=(k,f)=>((d&&d[k])||[]).filter(f||(()=>true)).length;
+  return {Customers:n('customers',c=>!c.mergedInto), Sales:n('sales',s=>!s.deleted), Girvi:n('girvi',g=>!g.deleted), Buying:n('buying',b=>!b.deleted), Credit:n('creditEntries',e=>!e.deleted)};
+}
+function idbKeyGet(key){ return idbOpen().then(db=>new Promise((res,rej)=>{ const r=db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error||new Error('read failed')); })); }
+function idbKeyPut(key,val){ return idbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error||new Error('write failed')); tx.onabort=()=>rej(tx.error||new Error('write aborted')); })); }
+function idbKeyDel(key){ return idbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).delete(key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error||new Error('delete failed')); })); }
+function idbAllKeys(){ return idbOpen().then(db=>new Promise((res,rej)=>{ const r=db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).getAllKeys(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error||new Error('list failed')); })); }
+function idbSaveGuarded(snapshot){
+  return idbOpen().then(db=>new Promise((resolve,reject)=>{
+    let tx; try{ tx=db.transaction(IDB_STORE,'readwrite',{durability:'strict'}); }catch(e0){ tx=db.transaction(IDB_STORE,'readwrite'); }
+    const st=tx.objectStore(IDB_STORE);
+    let failure=null;
+    const rq=st.get(IDB_ROW_KEY);
+    rq.onsuccess=()=>{
+      const cur=rq.result; const curRev=(cur&&cur.meta&&cur.meta._rev)||0;
+      if(cur && curRev!==_storageRev){ failure=Object.assign(new Error('The data was changed in another window'),{code:'STALE'}); tx.abort(); return; }
+      if(cur && recordTotal(cur)>0 && recordTotal(snapshot)===0){ failure=Object.assign(new Error('Refused to replace saved records with an empty database'),{code:'EMPTY'}); tx.abort(); return; }
+      const next=curRev+1; snapshot.meta=snapshot.meta||{}; snapshot.meta._rev=next;
+      st.put(snapshot, IDB_ROW_KEY);
+      tx.oncomplete=()=>{ _storageRev=next; resolve(next); };
+    };
+    rq.onerror=()=>{ failure=rq.error||new Error('read failed'); };
+    tx.onerror=()=>reject(failure||tx.error||new Error('IndexedDB write failed'));
+    tx.onabort=()=>reject(failure||tx.error||new Error('IndexedDB write aborted'));
+  }));
+}
+function lockStorage(reason){
+  _storageLocked=true; _storageLockReason=reason;
+  let el=document.getElementById('storageLockBanner');
+  if(!el){ el=document.createElement('div'); el.id='storageLockBanner'; el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:5000;background:#7A1010;color:#fff;padding:12px 18px;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);'; document.body.appendChild(el); }
+  const msg = reason==='stale' ? 'This app was changed in another window or tab, so this window stopped saving to avoid overwriting that work. Nothing already saved is lost.'
+    : reason==='empty' ? 'This window tried to replace your saved records with an empty database — that was blocked. Your saved data is untouched.'
+    : 'Your saved data could not be read just now, so nothing will be saved over it. Your data is not erased.';
+  el.innerHTML=`<div style="flex:1;min-width:240px;">🛑 <b>Saving is paused to protect your data.</b> ${msg}</div><button class="btn btn-sm btn-gold" onclick="location.reload()">Reload now</button><button class="btn btn-sm btn-ghost" onclick="downloadThisWindowData()">⬇ Keep a copy of this window's data</button>`;
+}
+function downloadThisWindowData(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='gayatri-jewellers-THIS-WINDOW-copy-'+todayStr()+'.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
 async function loadDB(){
-  try{
-    let data = await idbGet();
-    if(!data){
-      // First run on this device after the storage-engine upgrade: migrate
-      // any pre-existing localStorage data into IndexedDB. The old
-      // localStorage copy is deliberately left untouched afterward as a
-      // silent emergency fallback — never deleted, never relied upon again.
-      const raw = localStorage.getItem(DB_KEY);
-      if(raw){
-        try{ data = JSON.parse(raw); }catch(e2){ data = null; }
-      }
-      if(!data) data = defaultDB();
-      await idbSet(data);
-    }
-    return migrateDB(data);
-  }catch(e){
-    // IndexedDB unavailable for some reason — fall back to the old
-    // localStorage behaviour rather than losing access to the app entirely.
-    try{
-      const raw = localStorage.getItem(DB_KEY);
-      if(raw) return migrateDB(JSON.parse(raw));
-    }catch(e2){}
+  let data;
+  try{ data = await idbGet(); }
+  catch(e){
+    lockStorage('read-failed');            // never save over data that could not be read
+    try{ const raw=localStorage.getItem(DB_KEY); if(raw) return migrateDB(JSON.parse(raw)); }catch(e2){}
     return defaultDB();
   }
+  try{
+    if(!data){
+      // first run on this device: bring over any very old localStorage copy (it is left untouched)
+      const raw = localStorage.getItem(DB_KEY); let old=null;
+      if(raw){ try{ old=JSON.parse(raw); }catch(e2){ old=null; } }
+      data = old || defaultDB();
+      await idbSet(data);
+    } else {
+      _storageRev = (data.meta && data.meta._rev) || 0;
+      if(!('customerMerges' in data)){        // first open after this upgrade: keep an untouched copy of the old data
+        try{ if(!(await idbKeyGet(SNAP_PREFIX+'before-upgrade'))) await idbKeyPut(SNAP_PREFIX+'before-upgrade', {at:nowISO(), label:'Copy of your data made just before this upgrade', counts:countsOf(data), data:JSON.parse(JSON.stringify(data))}); }catch(e3){}
+      }
+    }
+  }catch(e){ /* a failed first-time write is retried by the normal save queue */ }
+  return migrateDB(data || defaultDB());
 }
-let _idbSaveInFlight = false, _idbSavePending = false, _idbLastError = null;
 async function flushIdbSaveQueue(){
-  if(_idbSaveInFlight) return;
+  if(_idbSaveInFlight || _storageLocked) return;
   _idbSaveInFlight = true;
-  while(_idbSavePending){
+  while(_idbSavePending && !_storageLocked){
     _idbSavePending = false;
     const snapshot = JSON.parse(JSON.stringify(DB));
     try{
-      await idbSet(snapshot);
-      _idbLastError = null;
+      const rev = await idbSaveGuarded(snapshot);
+      DB.meta._rev = rev; _lastSavedAt = nowISO(); _idbLastError = null; _idbRetry = 0;
     }catch(err){
       _idbLastError = err;
-      toast('⚠️ Could not save: '+(err&&err.message?err.message:'storage error')+'. Please back up soon.');
+      if(err && err.code==='STALE'){ lockStorage('stale'); }
+      else if(err && err.code==='EMPTY'){ lockStorage('empty'); }
+      else {
+        _idbSavePending = true;                     // keep the change and try again shortly
+        toast('⚠️ Could not save: '+(err&&err.message?err.message:'storage error')+' — retrying. Please back up soon.');
+        if(_idbRetry < 6){ _idbRetry++; setTimeout(()=>flushIdbSaveQueue(), 2500*_idbRetry); }
+        break;
+      }
     }
   }
   _idbSaveInFlight = false;
@@ -659,6 +732,64 @@ function saveDB(){
     return false;
   }
 }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && _idbSavePending) flushIdbSaveQueue(); });
+window.addEventListener('pagehide', ()=>{ if(_idbSavePending) flushIdbSaveQueue(); });
+/* ---- persistent storage + safety copies ---- */
+function persistLineText(){
+  return window._storagePersisted ? 'Protected from automatic clean-up by the browser: <b>Yes ✅</b>'
+    : 'Protected from automatic clean-up: <b>not granted by this browser ⚠️</b> — keep your backups up to date (Safari can clear data of websites that are not used for a long time; adding the app to the Home Screen helps).';
+}
+function requestPersistentStorage(){
+  try{
+    if(navigator.storage && navigator.storage.persist){
+      navigator.storage.persisted().then(p=> p ? true : navigator.storage.persist()).then(g=>{ window._storagePersisted=!!g; const el=document.getElementById('persistLine'); if(el) el.innerHTML=persistLineText(); }).catch(()=>{});
+    }
+  }catch(e){}
+}
+async function ensureDailySnapshot(){
+  if(_storageLocked || recordTotal(DB)===0) return;
+  const key=SNAP_PREFIX+'day-'+todayStr();
+  const keys=await idbAllKeys();
+  if(!keys.includes(key)) await idbKeyPut(key,{at:nowISO(), label:'Daily safety copy', counts:countsOf(DB), data:JSON.parse(JSON.stringify(DB))});
+  const days=(await idbAllKeys()).filter(k=>String(k).startsWith(SNAP_PREFIX+'day-')).sort();
+  while(days.length>3){ await idbKeyDel(days.shift()); }
+}
+function storageSafetyHTML(){
+  const last=_lastSavedAt?new Date(_lastSavedAt).toLocaleTimeString('en-IN'):'—';
+  return `<div style="margin-top:14px;border-top:1px dashed var(--gold-light);padding-top:12px;">
+    <div style="font-weight:700;">🛡 Data safety</div>
+    <div class="helpText">Storage: <b>IndexedDB</b> (permanent browser database) — ${_storageLocked?'<span style="color:var(--danger);font-weight:700;">PAUSED — reload needed</span>':'saving normally ✅'} • last save ${last}</div>
+    <div class="helpText" id="persistLine">${persistLineText()}</div>
+    <div class="helpText" style="margin-top:6px;">Safety copies kept inside the app (newest 3 days, plus one made just before an upgrade or restore). They protect against mistakes — the <b>backup file</b> is what protects you if the tablet or browser data is lost.</div>
+    <div id="snapList" style="margin-top:6px;"></div></div>`;
+}
+async function renderSnapshotList(){
+  const el=document.getElementById('snapList'); if(!el) return;
+  try{
+    const keys=(await idbAllKeys()).filter(k=>String(k).startsWith(SNAP_PREFIX)).sort().reverse();
+    if(!keys.length){ el.innerHTML='<div class="helpText">No safety copy yet — the first one is made automatically a few seconds after the app opens.</div>'; return; }
+    const items=[]; for(const k of keys){ const s=await idbKeyGet(k); if(s) items.push({k,s}); }
+    el.innerHTML=`<table><tr><th>Copy</th><th>Made</th><th>Records</th><th></th></tr>${items.map(({k,s})=>`<tr><td>${escH(s.label||k)}</td><td>${new Date(s.at).toLocaleString('en-IN')}</td><td class="helpText">${s.counts?Object.entries(s.counts).map(([a,b])=>a+' '+b).join(' • '):''}</td><td><button class="btn btn-sm btn-ghost" onclick="downloadSnapshot('${k}')">⬇</button> <button class="btn btn-sm btn-outline" onclick="restoreSnapshot('${k}')">Restore</button></td></tr>`).join('')}</table>`;
+  }catch(e){ el.innerHTML='<div class="helpText">Could not list the safety copies.</div>'; }
+}
+async function downloadSnapshot(key){
+  const s=await idbKeyGet(key); if(!s){ toast('Copy not found'); return; }
+  const blob=new Blob([JSON.stringify(s.data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='gayatri-jewellers-safety-copy-'+String(s.at).slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function restoreSnapshot(key){
+  askOwnerApproval('Restore this safety copy? Manager PIN required. Your current data is kept as a safety copy first.', ()=>{
+    confirmAction('Replace ALL current data with this safety copy and reload the app?', async ()=>{
+      try{
+        const s=await idbKeyGet(key); if(!s || !s.data) throw new Error('copy not found');
+        await idbKeyPut(SNAP_PREFIX+'before-restore', {at:nowISO(), label:'Copy of your data made just before a restore', counts:countsOf(DB), data:JSON.parse(JSON.stringify(DB))});
+        await idbSet(s.data);
+        toast('Restored — reloading…'); setTimeout(()=>location.reload(), 700);
+      }catch(err){ toast('Restore failed — your current data was NOT changed'); }
+    });
+  });
+}
+
 function logHistory(module, action, description){
   DB.history.unshift({id:uid('H'), ts:nowISO(), module, action, description});
   if(DB.history.length>3000) DB.history.length=3000;
@@ -818,7 +949,7 @@ function runGlobalSearch(qRaw){
   const saleMatches = DB.sales.filter(s=>!s.deleted && (s.billNo.toLowerCase().includes(q) || s.customerName.toLowerCase().includes(q) || s.date.includes(q) || String(s.grandTotal).includes(q) || s.items.some(i=>i.itemName.toLowerCase().includes(q))));
   if(saleMatches.length) groups.push({label:'Sales', items: saleMatches.slice(0,20).map(s=>({text:`${s.billNo} — ${s.customerName} — ${fmtMoney(s.grandTotal)} — ${fmtDate(s.date)}`, action:()=>{ closeModal(); viewSale(s.id); }}))});
 
-  const girviMatches = DB.girvi.filter(g=>!g.deleted && (g.customerName.toLowerCase().includes(q) || (g.itemDesc||'').toLowerCase().includes(q) || (g.referenceName||'').toLowerCase().includes(q) || g.date.includes(q)));
+  const girviMatches = DB.girvi.filter(g=>!g.deleted && girviSearchMatch(g,q));
   if(girviMatches.length) groups.push({label:'Girvi', items: girviMatches.slice(0,20).map(g=>({text:`${g.customerName} — ${g.itemDesc} — ${fmtMoney(g.outstandingPrincipal!==undefined?g.outstandingPrincipal:g.loanAmount)} — ${g.status}`, action:()=>{ closeModal(); viewGirvi(g.id); }}))});
 
   const invMatches = DB.inventory.filter(i=>!i.deleted && (i.itemName.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)));
@@ -866,7 +997,38 @@ function levDist(a,b){
   for(let i=1;i<=m;i++){ cur[0]=i; for(let j=1;j<=n;j++){ cur[j]=Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+(a[i-1]===b[j-1]?0:1)); } const t=prev; prev=cur; cur=t; }
   return prev[n];
 }
+/* Customers are written the way the shop writes them:  Name, Father, Caste, Village
+   e.g. "Ajay, Ramesh, Ninama, Sarwan".  The 4th part IS the village — there is no separate village box. */
+function parseNameParts(raw){
+  const s0=String(raw==null?'':raw);
+  const parts=s0.split(/[,،;|]+/).map(x=>x.replace(/\s+/g,' ').trim());
+  return {first:parts[0]||'', father:parts[1]||'', caste:parts[2]||'', village:parts[3]||'', hasSep:/[,،;|]/.test(s0), count:parts.filter(Boolean).length};
+}
+function fmtCustName(raw){
+  const s0=String(raw==null?'':raw).trim();
+  if(!/[,،;|]/.test(s0)) return s0.replace(/\s+/g,' ');
+  const cap=w=>w.replace(/(^|[\s.\-])([a-z])/g,(m,p,ch)=>p+ch.toUpperCase());
+  const t=s0.split(/[,،;|]+/).map(x=>cap(x.replace(/\s+/g,' ').trim()));
+  while(t.length && !t[t.length-1]) t.pop();
+  return t.join(', ');
+}
+function applyNameParts(c){
+  const P=parseNameParts(c.name);
+  if(P.hasSep){ c.father=P.father; c.caste=P.caste; c.village=P.village; }
+}
+/* two written-out names are the same person only if every part they BOTH have matches
+   (same first name but a different father / caste / village = a different person) */
 function nameSimilarity(a,b){
+  const A=parseNameParts(a), B=parseNameParts(b);
+  if(A.hasSep && B.hasSep){
+    const sims=[plainNameSim(A.first,B.first)];
+    ['father','caste','village'].forEach(k=>{ if(A[k] && B[k]) sims.push(plainNameSim(A[k],B[k])); });
+    const mn=Math.min(...sims);
+    return mn<0.75 ? Math.min(0.5,mn) : mn;
+  }
+  return plainNameSim(a,b);
+}
+function plainNameSim(a,b){
   a=normName(a); b=normName(b); if(!a||!b) return 0; if(a===b) return 1;
   if(a.split(' ').sort().join(' ')===b.split(' ').sort().join(' ')) return 0.97;
   const sh=a.length<=b.length?a:b, lg=a.length<=b.length?b:a;
@@ -907,14 +1069,15 @@ function touchCustomerPhone(c, phone){
   if(!custPhones(c).includes(np)){ c.altPhones=c.altPhones||[]; c.altPhones.push(phone); logHistory('Customer','Phone added','Extra number '+phone+' saved for '+c.name); }
 }
 function findOrCreateCustomer(name, phone, opts){
-  name=(name||'').trim(); if(!name) return null; phone=(phone||'').trim();
+  name=fmtCustName(name); if(!name) return null; phone=(phone||'').trim();
   let c=null;
   if(!(opts&&opts.forceNew)){
     const nn=normName(name), np=normPhone(phone);
     c=liveCustomers().find(x=> normName(x.name)===nn && (!np || !custPhones(x).length || custPhones(x).includes(np)));
   }
   if(!c){
-    c={id:uid('CUS'), name, phone, address:'', notes:'', createdAt:nowISO(), creditEnabled:false, village:'', referredBy:'', familyLink:'', tags:'', photo:null, photos:[], altPhones:[], aliases:[], photoHistory:[], noteLog:[]};
+    c={id:uid('CUS'), name, phone, address:'', notes:'', createdAt:nowISO(), creditEnabled:false, village:'', referredBy:'', familyLink:'', tags:'', photo:null, photos:[], altPhones:[], aliases:[], photoHistory:[], noteLog:[], father:'', caste:''};
+    applyNameParts(c);
     DB.customers.push(c);
     logHistory('Customer','Created','New customer added: '+name+(phone?' ('+phone+')':''));
   } else if(phone) touchCustomerPhone(c, phone);
@@ -982,7 +1145,7 @@ function findDuplicatePairs(){
   list.forEach(c=>{ const n=normName(c.name); if(!n) return; (buckets[n[0]]=buckets[n[0]]||[]).push({c,n}); });
   Object.keys(buckets).forEach(key=>{ const arr=buckets[key];
     for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
-      const x=arr[i], y=arr[j]; if(Math.abs(x.n.length-y.n.length)>4) continue;
+      const x=arr[i], y=arr[j]; if(Math.abs(x.n.length-y.n.length)>4 && !(parseNameParts(x.c.name).hasSep && parseNameParts(y.c.name).hasSep)) continue;
       const k=[x.c.id,y.c.id].sort().join('|'); if(seen.has(k)) continue;
       const sim=nameSimilarity(x.c.name,y.c.name); if(sim<0.88) continue;
       const px=custPhones(x.c), py=custPhones(y.c);
@@ -1041,6 +1204,7 @@ function attachCustomerPicker(nameId, phoneId, opts){
   opts=opts||{};
   const ne=document.getElementById(nameId); if(!ne) return;
   ne.removeAttribute('list'); ne.setAttribute('autocomplete','off');
+  ne.placeholder='Name, Father, Caste, Village   e.g. Ajay, Ramesh, Ninama, Sarwan';
   const field=ne.closest('.field')||ne.parentNode; field.style.position='relative';
   field.querySelectorAll('datalist').forEach(d=>d.remove());
   let pe=phoneId?document.getElementById(phoneId):null;
@@ -1053,7 +1217,8 @@ function attachCustomerPicker(nameId, phoneId, opts){
   pe.setAttribute('inputmode','tel');
   const status=document.createElement('div'); status.className='cpStatus'; status.id=nameId+'_status';
   const drop=document.createElement('div'); drop.className='cpDrop hidden'; drop.id=nameId+'_drop';
-  field.appendChild(status); field.appendChild(drop);
+  const partsEl=document.createElement('div'); partsEl.id=nameId+'_parts'; partsEl.className='cpParts';
+  field.appendChild(partsEl); field.appendChild(status); field.appendChild(drop);
   _cp[nameId]={phoneId, opts};
   window._pickedCustomerId[nameId] = (opts.cid && DB.customers.find(x=>x.id===opts.cid && !x.mergedInto)) ? opts.cid : null;
   delete ne.dataset.newOk;
@@ -1073,6 +1238,8 @@ function cpRefresh(nameId, showDrop){
   const st=_cp[nameId]; if(!st) return;
   const ne=document.getElementById(nameId), pe=document.getElementById(st.phoneId), drop=document.getElementById(nameId+'_drop'), status=document.getElementById(nameId+'_status');
   if(!ne||!drop||!status) return;
+  const pEl=document.getElementById(nameId+'_parts');
+  if(pEl){ const P0=parseNameParts(fmtCustName(ne.value)); pEl.innerHTML = P0.hasSep ? [['',P0.first],['Father: ',P0.father],['Caste: ',P0.caste],['Village: ',P0.village]].filter(x=>x[1]).map(x=>`<span class="partChip">${x[0]===''?'👤 ':x[0]}<b>${escH(x[1])}</b></span>`).join('') : ''; }
   let name=(ne.value||'').trim(), phone=pe?(pe.value||'').trim():'';
   if(/^[\d\s+\-]{3,}$/.test(name)){ phone=phone||name; name=''; }
   const pid=window._pickedCustomerId[nameId];
@@ -1225,8 +1392,8 @@ function custPhotoButtonsHTML(){
 function openNewCustomerForm(){
   custPhotoData=null;
   const body=`<div class="field"><label>Photo</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><div id="custPhotoPreview" class="photoPlaceholder">👤</div>${custPhotoButtonsHTML()}</div></div>
-  <div class="grid grid-2" style="margin-top:12px;"><div class="field"><label>Name *</label><input id="ncName" placeholder="Type name — existing customers are suggested"></div><div class="field"><label>Phone</label><input id="ncPhone" inputmode="tel"></div></div>
-  <div class="grid grid-2" style="margin-top:12px;"><div class="field"><label>Village / Locality</label><input id="ncVillage"></div><div class="field"><label>Reference / Notes</label><input id="ncNotes"></div></div>`;
+  <div class="grid grid-2" style="margin-top:12px;"><div class="field"><label>Name, Father, Caste, Village *</label><input id="ncName"></div><div class="field"><label>Phone</label><input id="ncPhone" inputmode="tel"></div></div>
+  <div class="field" style="margin-top:12px;"><label>Reference / Notes</label><input id="ncNotes"></div>`;
   openModal('New Customer', body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:T('save'), cls:'btn-primary', onClick:saveNewCustomer}
@@ -1240,8 +1407,8 @@ function saveNewCustomer(){
   const before=DB.customers.length;
   const c=resolveCustomer('ncName','ncPhone');
   const isNew=DB.customers.length>before;
-  const v=document.getElementById('ncVillage').value.trim(), n=document.getElementById('ncNotes').value.trim();
-  if(v && !c.village) c.village=v; if(n) c.notes=(c.notes?c.notes+' | ':'')+n;
+  const n=document.getElementById('ncNotes').value.trim();
+  if(n) c.notes=(c.notes?c.notes+' | ':'')+n;
   if(custPhotoData && c.photo!==custPhotoData) setCustomerPhoto(c, custPhotoData, c.photo?'replaced in profile':'added in profile');
   saveDB(); closeModal(); toast(isNew?'Customer added':'Customer already existed — opened existing profile');
   viewCustomerLedger(c.id);
@@ -1426,8 +1593,8 @@ function renderDashboard(){
   const alerts=[];
   const _drafts=DB.girvi.filter(g=>!g.deleted && g.status==='draft');
   if(_drafts.length) alerts.push(`📋 <b>${_drafts.length}</b> girvi draft${_drafts.length>1?'s are':' is'} waiting for details — <a class="cpLink" onclick="_grFilter='draft';goTo('girvi')">open drafts</a>`);
-  const _noBag=DB.girvi.filter(g=>!g.deleted && g.status==='active' && !(g.bagColor||'').trim()).length;
-  if(_noBag) alerts.push(`🎒 <b>${_noBag}</b> active girvi loan${_noBag>1?'s have':' has'} no vault bag colour — add it so the item is easy to find at closure. <a class="cpLink" onclick="_grBag='__none';goTo('girvi')">show them</a>`);
+  const _incomplete=DB.girvi.filter(g=>!g.deleted && g.status==='active' && girviIncomplete(g)).length;
+  if(_incomplete) alerts.push(`⚠️ <b>${_incomplete}</b> active girvi entr${_incomplete>1?'ies have':'y has'} an item with no name or no weight — open and complete ${_incomplete>1?'them':'it'}.`);
   const _dups=liveCustomers().length<=1500 ? findDuplicatePairs().length : 0;
   if(_dups) alerts.push(`🔎 <b>${_dups}</b> possible duplicate customer${_dups>1?'s':''} — <a class="cpLink" onclick="openDuplicatesReview()">review &amp; merge</a>`);
   overdueGirvi.forEach(g=> alerts.push(`Girvi loan for <b>${g.customerName}</b> (${fmtWt(g.weight)}) is overdue since ${fmtDate(g.dueDate)}.`));
@@ -2397,8 +2564,7 @@ function sharePdfGirvi(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
   const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
   const rows = [
-    ['Date', fmtDate(g.date)], ['Customer', g.customerName], ['Item', g.itemDesc], ['Metal', g.metal],
-    ['Weight', fmtWt(g.weight)], ['Purity', (g.purity||100)+'%'], ['Loan Amount', fmtMoney(g.loanAmount)],
+    ['Date', fmtDate(g.date)], ['Customer', girviCustomerLine(g)], ...girviItemRows(g), ['Loan Amount', fmtMoney(g.loanAmount)],
     ['Outstanding Principal', fmtMoney(principal)], ['Interest Rate', g.interestRatePct+'% / month'],
     ['Due Date', g.dueDate?fmtDate(g.dueDate):'-'], ['Reference', g.referenceName||'-'], ['Bag', g.bagColor||'-']
   ];
@@ -2469,8 +2635,7 @@ function printGirviReceipt(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
   const principal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
   const rows = [
-    ['Date', fmtDate(g.date)], ['Customer', g.customerName], ['Item', g.itemDesc], ['Metal', g.metal],
-    ['Weight', fmtWt(g.weight)], ['Purity', (g.purity||100)+'%'], ['Loan Amount', fmtMoney(g.loanAmount)],
+    ['Date', fmtDate(g.date)], ['Customer', girviCustomerLine(g)], ...girviItemRows(g), ['Loan Amount', fmtMoney(g.loanAmount)],
     ['Outstanding Principal', fmtMoney(principal)], ['Interest Rate', g.interestRatePct+'% / month'],
     ['Due Date', g.dueDate?fmtDate(g.dueDate):'-'], ['Reference', g.referenceName||'-'], ['Bag', g.bagColor||'-']
   ];
@@ -2726,7 +2891,7 @@ function bagPickerHTML(prefix, current){
   const match=list.find(c=>c.toLowerCase()===cur.toLowerCase());
   const sel = cur ? (match||'__other') : '';
   return `<div class="field"><label>🎒 Vault Bag Colour</label>
-    <select id="${prefix}Bag" onchange="bagPickerChange('${prefix}')"><option value="">— not set —</option>${list.map(c=>`<option value="${escH(c)}" ${sel===c?'selected':''}>${escH(c)}</option>`).join('')}<option value="__other" ${sel==='__other'?'selected':''}>Other (type a name)…</option></select>
+    <select id="${prefix}Bag" onchange="bagPickerChange('${prefix}')"><option value="">Not selected</option>${list.map(c=>`<option value="${escH(c)}" ${sel===c?'selected':''}>${escH(c)}</option>`).join('')}<option value="__other" ${sel==='__other'?'selected':''}>Other (type a name)…</option></select>
     <input id="${prefix}BagOther" class="${sel==='__other'?'':'hidden'}" placeholder="Custom bag name / colour" value="${sel==='__other'?escH(cur):''}" oninput="bagHint('${prefix}')" style="margin-top:6px;">
     <div class="helpText" id="${prefix}BagHint" style="margin-top:4px;"></div></div>`;
 }
@@ -2762,7 +2927,7 @@ function bagCounts(){
   return {list:Object.values(map).sort((a,b)=>b.count-a.count), none};
 }
 function closureBagBanner(g){
-  if(!g.bagColor) return `<div class="approveBox" style="background:var(--warn-bg);border-color:var(--gold);margin-top:0;">📦 <b>No bag colour was recorded</b> for this item — check your diary or the vault.</div>`;
+  if(!g.bagColor) return `<div class="approveBox" style="background:var(--warn-bg);border-color:var(--gold);margin-top:0;">🎒 <b>Bag: Not selected</b> for this item — check your diary or the vault.</div>`;
   const c=bagCss(g.bagColor);
   return `<div class="bagBanner" style="border-color:${c};"><div class="bagSwatch" style="background:${c};"></div><div>
     <div class="helpText" style="margin:0;">Take this item from the vault — it is in the</div>
@@ -2784,7 +2949,7 @@ function renderGirvi(){
   if(!['active','overdue','draft'].includes(_grFilter)) _grFilter='active';
   const tabs=[['active','Active ('+act.length+')'],['overdue','Overdue ('+od.length+')'],['draft','📋 Drafts'+(drafts.length?' ('+drafts.length+')':'')]];
   const villages=[...new Map(DB.girvi.filter(g=>!g.deleted&&(g.status==='active'||g.status==='draft')).map(g=>customerById(g.customerId)).filter(c=>c&&c.village).map(c=>[normName(c.village),c.village])).values()].sort();
-  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline" onclick="openVillageLookup('')">🏘 Village Check</button><button class="btn btn-primary" onclick="openGirviForm()">+ ${T('newGirvi')}</button></div></div>`;
+  let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="openGirviForm()">+ ${T('newGirvi')}</button></div></div>`;
   html += `<div class="statGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
     <div class="statCard"><div class="lbl">Active Loans</div><div class="val">${act.length}</div></div>
     <div class="statCard" style="border-color:var(--gold)"><div class="lbl">Total Outstanding</div><div class="val" style="font-size:19px;">${fmtMoney(totalOut)}</div><div class="sub">active loans only</div></div>
@@ -2792,7 +2957,7 @@ function renderGirvi(){
     <div class="statCard" style="border-color:var(--silver-accent)"><div class="lbl">Draft Entries</div><div class="val">${drafts.length}</div></div>
   </div>`;
   html += `<div class="card"><div class="pillTabs" id="girviFilterTabs">${tabs.map(([k,l])=>`<div class="pillTab ${_grFilter===k?'active':''}" data-k="${k}" onclick="setGirviFilter('${k}')">${l}</div>`).join('')}</div>
-    <div class="filterBar"><div class="field" style="flex:2;min-width:200px;"><input id="girviSearch" placeholder="🔍 Search name, phone, village, item, bag colour…" oninput="renderGirviTable()"></div>
+    <div class="filterBar"><div class="field" style="flex:2;min-width:200px;"><input id="girviSearch" placeholder="🔍 Search name, phone, village, item, bag, amount, date…" oninput="renderGirviTable()"></div>
     <div class="field"><select id="girviVillage" onchange="_grVillage=this.value;renderGirviTable()"><option value="">All villages</option>${villages.map(v=>`<option ${_grVillage===v?'selected':''}>${escH(v)}</option>`).join('')}</select></div></div>
     <div id="girviBagChips" class="chipRow"></div>
     <div id="girviTableWrap"></div>
@@ -2811,7 +2976,7 @@ function renderGirviChips(){
   const bc=bagCounts();
   el.innerHTML = `<span class="helpText" style="align-self:center;">🎒 Bags:</span><span class="chipBtn ${_grBag===''?'active':''}" onclick="setGirviBag('')">All bags</span>`
     + bc.list.map(b=>`<span class="chipBtn ${_grBag.toLowerCase()===b.name.toLowerCase()?'active':''}" onclick="setGirviBag('${escH(b.name).replace(/'/g,'&#39;')}')">${bagChipHTML(b.name)} ${b.count}</span>`).join('')
-    + (bc.none?`<span class="chipBtn ${_grBag==='__none'?'active':''}" onclick="setGirviBag('__none')">No bag set ${bc.none}</span>`:'');
+    + (bc.none?`<span class="chipBtn ${_grBag==='__none'?'active':''}" onclick="setGirviBag('__none')">Not selected ${bc.none}</span>`:'');
 }
 function girviInterestDue(g){
   const months = daysBetween(g.lastInterestDate||g.date) / 30;
@@ -2838,11 +3003,7 @@ function renderGirviTable(){
   if(_grBag==='__none') rows=rows.filter(g=>!(g.bagColor||'').trim());
   else if(_grBag) rows=rows.filter(g=>(g.bagColor||'').toLowerCase()===_grBag.toLowerCase());
   if(_grVillage) rows=rows.filter(g=>{ const c=customerById(g.customerId); return c && normName(c.village)===normName(_grVillage); });
-  if(q) rows = rows.filter(g=>{
-    const cust = customerById(g.customerId);
-    return (g.customerName||'').toLowerCase().includes(q) || (cust&&customerMatchesQuery(cust,q)) ||
-      (g.referenceName||'').toLowerCase().includes(q) || (g.itemDesc||'').toLowerCase().includes(q) || (g.bagColor||'').toLowerCase().includes(q);
-  });
+  if(q) rows = rows.filter(g=>girviSearchMatch(g,q));
   let html = `<table><tr><th>Customer</th><th>Item</th><th>Bag</th><th>Wt</th><th>Loan Date</th><th>Days at Shop</th><th>Principal Due</th><th>Interest/mo</th><th>Status</th><th></th></tr>`;
   if(rows.length===0) html += `<tr><td colspan="10"><div class="empty"><div class="big">🔐</div>${(q||_grBag||_grVillage)?'No matching active loan found.':(_grFilter==='draft'?'No draft entries.':'No active girvi loans.')}</div></td></tr>`;
   rows.forEach(g=>{
@@ -2853,9 +3014,9 @@ function renderGirviTable(){
     const ph = g.photo || (cust&&customerMainPhoto(cust));
     const nph = (g.photos||[]).length;
     html += `<tr class="${girviIsOverdue(g)?'rowOverdue':''}">
-      <td><div style="display:flex;align-items:center;gap:8px;">${ph?`<img src="${ph}" class="photoThumb" style="width:32px;height:32px;cursor:pointer;flex-shrink:0;" onclick="window._photoViewerList=[{data:this.src,label:'${escH(g.customerName).replace(/'/g,'&#39;')}'}];openPhotoViewer(0)">`:`<div class="photoPlaceholder" style="width:32px;height:32px;font-size:13px;flex-shrink:0;">👤</div>`}<div><div style="font-weight:600;">${escH((cust&&cust.name)||g.customerName)}</div>${g.referenceName?`<div class="helpText">via ${escH(g.referenceName)}</div>`:''}</div></div></td>
-      <td>${g.itemDesc ? escH(g.itemDesc) : '<span class="helpText">— pending —</span>'}${nph?' 📷'+(nph>1?nph:''):''}</td>
-      <td>${g.bagColor?bagChipHTML(g.bagColor):'<span class="helpText">—</span>'}</td>
+      <td><div style="display:flex;align-items:center;gap:8px;">${ph?`<img src="${ph}" class="photoThumb" style="width:32px;height:32px;cursor:pointer;flex-shrink:0;" onclick="window._photoViewerList=[{data:this.src,label:'${escH(g.customerName).replace(/'/g,'&#39;')}'}];openPhotoViewer(0)">`:`<div class="photoPlaceholder" style="width:32px;height:32px;font-size:13px;flex-shrink:0;">👤</div>`}<div><div style="font-weight:600;">${escH((cust&&cust.name)||g.customerName)}${phoneAfterHTML(g.customerId)}</div>${g.referenceName?`<div class="helpText">via ${escH(g.referenceName)}</div>`:''}</div></div></td>
+      <td>${girviItemCellHTML(g,nph)}</td>
+      <td>${g.bagColor?bagChipHTML(g.bagColor):`<span class="helpText">Not selected</span> <a class="cpLink" onclick="openGirviBagPicker('${g.id}')">＋ select</a>`}</td>
       <td>${isDraft && !g.weight ? '-' : fmtWt(g.weight)}</td>
       <td>${fmtDate(g.date)}</td>
       <td><span class="agingTag ${days>60 && g.status==='active'?'late':''}">${days} din</span></td>
@@ -2873,7 +3034,7 @@ function renderGirviTable(){
 
 /* ---- item photos: camera + gallery, several photos ---- */
 function girviPhotoPickerHTML(){
-  return `<div class="field" style="margin-top:12px;"><label>Item Photos <span class="helpText">(optional)</span></label>
+  return `<div class="field" style="margin-top:12px;"><label>More photos <span class="helpText">(whole loan / bag — optional)</span></label>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
       <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('grCamInput').click()">📷 Take Photo</button>
       <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('grGalInput').click()">🖼 From Gallery</button>
@@ -2971,12 +3132,6 @@ function grApplyCustPhoto(cust, g){
   else if(grCust.mode==='keep'){ g.photo=grCust.data||g.photo||null; }
   else if(grCust.mode==='none'){ g.photo=null; }
 }
-function grVillageCheck(){
-  openVillageLookup((document.getElementById('grVillage')||{}).value||'', {onPick:(e)=>{
-    const r=document.getElementById('grRefName'); if(r) r.value=e.name+(e.village?' ('+e.village+')':'');
-    toast('Reference set to '+e.name);
-  }});
-}
 
 /* Reusable: compress any uploaded/captured photo to a small JPEG data URL
    so it can never overflow localStorage. Used by Girvi and Customer photos. */
@@ -3022,7 +3177,11 @@ function recompressDataUrl(dataUrl, maxDim, quality){
     img.src = dataUrl;
   });
 }
-async function freeUpSpace(){
+function freeUpSpace(){
+  confirmAction('This permanently lowers the quality of the stored photos to save space (names and records are not touched). A safety copy is made first. Continue?', freeUpSpaceNow);
+}
+async function freeUpSpaceNow(){
+  try{ await idbKeyPut(SNAP_PREFIX+'before-photo-shrink', {at:nowISO(), label:'Copy made just before shrinking photos', counts:countsOf(DB), data:JSON.parse(JSON.stringify(DB))}); }catch(e5){}
   toast('Shrinking stored photos…');
   const sizeBefore = new Blob([JSON.stringify(DB)]).size;
   const jobs = [];
@@ -3032,7 +3191,7 @@ async function freeUpSpace(){
       jobs.push(Promise.all(c.photos.map(p=>recompressDataUrl(p,200,0.5))).then(arr=>{ c.photos=arr; }));
     }
   });
-  DB.girvi.forEach(g=>{ if(g.photo) jobs.push(recompressDataUrl(g.photo,200,0.5).then(v=>{ g.photo=v; })); });
+  DB.girvi.forEach(g=>{ if(g.photo) jobs.push(recompressDataUrl(g.photo,200,0.5).then(v=>{ g.photo=v; })); (g.items||[]).forEach(it=>{ if(it.photo) jobs.push(recompressDataUrl(it.photo,200,0.5).then(v=>{ it.photo=v; })); }); (g.photos||[]).forEach(p=>{ if(p.data) jobs.push(recompressDataUrl(p.data,200,0.5).then(v=>{ p.data=v; })); }); });
   DB.inventory.forEach(i=>{
     if(Array.isArray(i.photos) && i.photos.length){
       jobs.push(Promise.all(i.photos.map(p=>recompressDataUrl(p,200,0.5))).then(arr=>{ i.photos=arr; }));
@@ -3046,36 +3205,216 @@ async function freeUpSpace(){
   toast('Done — freed about '+savedKB+' KB');
 }
 /* ---- the Girvi form (new) ---- */
+/* =====================================================================
+   GIRVI — MULTIPLE ITEMS IN ONE ENTRY  (added; old single-item entries keep working unchanged)
+   New entries store  g.items = [{id,name,category,weight,purity,karat,loanAmount,notes,photo}].
+   The old top-level fields (itemDesc, metal, weight, purity) are kept up to date as totals so
+   reports, receipts, search and every older screen continue to work.
+   An old entry without g.items is read as a one-item list on the fly — it is NOT rewritten.
+===================================================================== */
+let grItemsDraft = [], grAutoTotal = true, grTotalId = null, grTotalFixed = null, grItemPhotoTarget = 0;
+function girviItems(g){
+  if(g && Array.isArray(g.items) && g.items.length) return g.items;
+  if(!g || (!g.itemDesc && !(Number(g.weight)>0))) return [];
+  return [{id:'legacy', name:g.itemDesc||'', category:g.metal||'Silver', weight:Number(g.weight)||0, purity:(g.purity===undefined||g.purity==='')?100:g.purity, karat:null, loanAmount:Number(g.loanAmount)||0, notes:'', photo:null, legacy:true}];
+}
+function girviItemCount(g){ return girviItems(g).length; }
+function girviIsMulti(g){ return girviItemCount(g)>1; }
+function girviIncomplete(g){ return girviItems(g).some(i=>!(i.name||'').trim() || !(Number(i.weight)>0)); }
+function parsePurityInput(v){
+  const s=String(v==null?'':v).trim(); if(!s) return {pct:100, karat:null};
+  const m=s.match(/^(\d+(?:\.\d+)?)\s*(k|kt|karat|carat)$/i);
+  if(m){ const k=parseFloat(m[1]); if(k>0 && k<=24) return {pct:Math.round(k/24*10000)/100, karat:k}; }
+  const n=parseFloat(s); return {pct:(n>0 && n<=100)?n:100, karat:null};
+}
+function girviAggregate(items){
+  const names=items.map(i=>i.name).filter(Boolean);
+  const cats=[...new Set(items.map(i=>i.category||'Silver'))];
+  const totalW=items.reduce((a,i)=>a+(Number(i.weight)||0),0);
+  const pure=items.reduce((a,i)=>a+(Number(i.weight)||0)*((Number(i.purity)||100)/100),0);
+  return {itemDesc:names.join(' + '), metal:cats.length===1?cats[0]:(cats.length?'Mixed':'Silver'), weight:Math.round(totalW*1000)/1000, purity:totalW>0?Math.round(pure/totalW*10000)/100:100};
+}
+function girviSummaryLine(g){
+  const n=girviItemCount(g);
+  return n>1 ? `${escH(g.itemDesc)} — ${n} items, total ${fmtWt(g.weight)}` : `${escH(g.itemDesc)} — ${fmtWt(g.weight)}, ${g.purity||100}% ${g.metal}`;
+}
+function phoneAfterHTML(cid){ const c=customerById(cid); return (c&&c.phone)?` <span class="phoneAfter">— ${escH(c.phone)}</span>`:''; }
+function girviCustomerLine(g){ const c=customerById(g.customerId); return g.customerName+((c&&c.phone)?' — '+c.phone:''); }
+function girviItemRows(g){
+  const items=girviItems(g);
+  if(items.length<=1) return [['Item', g.itemDesc], ['Metal', g.metal], ['Weight', fmtWt(g.weight)], ['Purity', (g.purity||100)+'%']];
+  const rows=[['Items', items.length+' items in this girvi']];
+  items.forEach((it,i)=>rows.push([`${i+1}. ${it.name||'Item'}`, `${it.category}, ${fmtWt(it.weight)} @ ${it.karat?it.karat+'K':((it.purity||100)+'%')}${it.loanAmount?', '+fmtMoney(it.loanAmount):''}`]));
+  rows.push(['Total Weight', fmtWt(g.weight)]);
+  return rows;
+}
+function girviItemCellHTML(g, nph){
+  const n=girviItemCount(g);
+  let h=(n>1?`<span class="tag tag-gold" title="Multi-item girvi">${n} items</span> `:'')+(g.itemDesc?escH(g.itemDesc):'<span class="helpText">— pending —</span>');
+  if(nph) h+=' 📷'+(nph>1?nph:'');
+  if(g.status==='active' && girviIncomplete(g)) h+=' <span class="tag tag-red" title="An item has no name or no weight">⚠ incomplete</span>';
+  return h;
+}
+function girviItemsLineHTML(g){
+  const its=girviItems(g); if(its.length<2) return '';
+  return `<span class="tag tag-gold">${its.length} items</span> `+its.map(i=>escH((i.name||'Item')+' '+fmtWt(i.weight))).join(' • ')+' ';
+}
+function girviItemsTableHTML(g){
+  const items=girviItems(g); if(!items.length) return '';
+  const anyAmt=items.some(i=>Number(i.loanAmount)>0);
+  return `<h4 style="font-family:var(--font-display);color:var(--maroon-dark);margin:14px 0 4px;">Items in this loan (${items.length}) ${items.length>1?'<span class="tag tag-gold">Multi-item</span>':''}</h4>
+    <table><tr><th>#</th><th>Item</th><th>Category</th><th>Weight</th><th>Purity</th>${anyAmt?'<th>Loan</th>':''}<th>Photo</th></tr>
+    ${items.map((it,i)=>`<tr><td>${i+1}</td><td><b>${escH(it.name||'—')}</b>${it.notes?`<div class="helpText">${escH(it.notes)}</div>`:''}</td><td>${escH(it.category||'')}</td><td>${fmtWt(it.weight)}</td><td>${it.karat?it.karat+'K <span class="helpText">('+it.purity+'%)</span>':(it.purity||100)+'%'}</td>${anyAmt?`<td>${it.loanAmount?fmtMoney(it.loanAmount):'—'}</td>`:''}<td>${it.photo?`<img src="${it.photo}" class="photoThumb" style="width:44px;height:44px;cursor:zoom-in;" onclick="girviItemPhotoView('${g.id}',${i})">`:'—'}</td></tr>`).join('')}
+    ${items.length>1?`<tr><td></td><td><b>Total</b></td><td></td><td><b>${fmtWt(g.weight)}</b></td><td></td>${anyAmt?`<td><b>${fmtMoney(items.reduce((a,i)=>a+(Number(i.loanAmount)||0),0))}</b></td>`:''}<td></td></tr>`:''}</table>`;
+}
+function girviItemPhotoView(gid, idx){
+  const g=DB.girvi.find(x=>x.id===gid); if(!g) return;
+  const its=girviItems(g); const list=its.filter(i=>i.photo).map(i=>({data:i.photo,label:i.name||'Item'}));
+  const pos=list.findIndex(x=>x.data===(its[idx]||{}).photo);
+  window._photoViewerList=list; openPhotoViewer(Math.max(pos,0));
+}
+/* ---- search: every word you type must match somewhere in the loan, customer or items ---- */
+function girviSearchText(g, skipCustomer){
+  const cust=customerById(g.customerId); const parts=[];
+  if(!skipCustomer){ parts.push(g.customerName); if(cust){ parts.push(cust.name, cust.phone, (cust.altPhones||[]).join(' '), cust.village, cust.father, cust.caste, cust.tags); } }
+  parts.push(g.referenceName, g.bagColor, g.notes, g.itemDesc, g.metal, g.status, g.date, fmtDate(g.date), g.loanAmount, g.outstandingPrincipal, g.weight, g.dueDate, g.dueDate?fmtDate(g.dueDate):'', girviIsMulti(g)?'multi item multiple items':'', g.bagColor?'':'bag not selected');
+  girviItems(g).forEach(i=>parts.push(i.name, i.category, i.notes, i.weight, i.loanAmount, i.karat?i.karat+'k':''));
+  return normName(parts.filter(x=>x!==undefined && x!==null && x!=='').join(' '));
+}
+function girviSearchMatch(g, q){
+  const toks=normName(q).split(' ').filter(Boolean); if(!toks.length) return true;
+  const hay=girviSearchText(g); return toks.every(t=>hay.includes(t));
+}
+function ledgerExtraTexts(){
+  const m={}; const add=(id,t)=>{ if(id && t) m[id]=(m[id]||'')+' '+t; };
+  DB.girvi.forEach(g=>add(g.customerId, girviSearchText(g,true)));
+  DB.sales.forEach(s=>add(s.customerId, s.billNo+' '+(s.items||[]).map(i=>i.itemName).join(' ')));
+  DB.creditEntries.forEach(e=>add(e.customerId, e.description));
+  DB.jobs.forEach(j=>add(j.customerId, (j.itemDesc||'')+' '+(j.karigarName||'')));
+  DB.buying.forEach(b=>add(b.customerId, b.itemDesc));
+  Object.keys(m).forEach(k=>{ m[k]=normName(m[k]); });
+  return m;
+}
+function ledgerMatch(c, q, extra){
+  const toks=normName(q).split(' ').filter(Boolean); if(!toks.length) return true;
+  const hay=normName([c.name,(c.aliases||[]).join(' '),c.phone,(c.altPhones||[]).join(' '),c.village,c.father,c.caste,c.tags,c.notes,c.referredBy,c.familyLink].filter(Boolean).join(' '))+' '+((extra&&extra[c.id])||'');
+  return toks.every(t=>hay.includes(t));
+}
+/* ---- the items editor used by the new / complete-draft / edit girvi forms ---- */
+function grNewItem(){ return {id:uid('GIT'), name:'', category:'Silver', weight:'', purity:100, purityText:'100', karat:null, loanAmount:'', notes:'', photo:null}; }
+function grItemsToDraft(g){
+  const its=girviItems(g);
+  if(!its.length) return [grNewItem()];
+  return its.map(i=>({id:(i.id==='legacy'?uid('GIT'):i.id), name:i.name||'', category:i.category||'Silver', weight:i.weight||'', purity:i.purity||100, purityText:i.karat?(i.karat+'K'):String(i.purity||100), karat:i.karat||null, loanAmount:i.loanAmount||'', notes:i.notes||'', photo:i.photo||null}));
+}
+function girviItemsEditorHTML(){
+  return `<div class="field" style="margin-top:12px;"><label>Items in this girvi <span class="helpText">— add every article (e.g. silver kada + gold haar)</span></label>
+    <div id="grItemsWrap"></div>
+    <button type="button" class="btn btn-sm btn-outline" onclick="grAddItem()">＋ Add another item</button>
+    <div id="grItemsSummary" class="helpText" style="margin-top:8px;"></div><div id="grItemWarn"></div>
+    <input type="file" accept="image/*" capture="environment" id="grItemCam" style="display:none" onchange="grItemPhotoChosen(event)">
+    <input type="file" accept="image/*" id="grItemGal" style="display:none" onchange="grItemPhotoChosen(event)"></div>`;
+}
+function renderGrItemRows(){
+  const wrap=document.getElementById('grItemsWrap'); if(!wrap) return;
+  wrap.innerHTML=grItemsDraft.map((it,i)=>`<div class="giCard">
+    <div class="giHead"><b>Item ${i+1}</b>${grItemsDraft.length>1?`<button type="button" class="miniRemove" title="Remove this item" onclick="grRemoveItem(${i})">✕</button>`:''}</div>
+    <div class="giGrid">
+      <div class="field"><label>Item / design *</label><input id="gri-name-${i}" value="${escH(it.name)}" placeholder="e.g. Silver kada" oninput="grItemSet(${i},'name',this.value)"></div>
+      <div class="field"><label>Category</label><select id="gri-cat-${i}" onchange="grItemSet(${i},'category',this.value)">${['Silver','Gold','Other'].map(c=>`<option ${it.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Weight (g) *</label><input id="gri-wt-${i}" type="number" step="0.001" value="${it.weight===''?'':it.weight}" oninput="grItemSet(${i},'weight',this.value)"></div>
+      <div class="field"><label>Purity (% or karat)</label><input id="gri-pur-${i}" list="grPurityList" value="${escH(it.purityText)}" placeholder="92.5 or 22K" oninput="grItemSet(${i},'purityText',this.value)"></div>
+      <div class="field"><label>Loan on this item ₹ <span class="helpText">(optional)</span></label><input id="gri-amt-${i}" type="number" value="${it.loanAmount===''?'':it.loanAmount}" oninput="grItemSet(${i},'loanAmount',this.value)"></div>
+      <div class="field"><label>Notes <span class="helpText">(optional)</span></label><input id="gri-note-${i}" value="${escH(it.notes)}" oninput="grItemSet(${i},'notes',this.value)"></div>
+    </div>
+    <div class="giPhoto">${it.photo?`<img src="${it.photo}" class="photoThumb" style="width:52px;height:52px;">`:''}
+      <button type="button" class="btn btn-sm btn-outline" onclick="grItemPhoto(${i},'cam')">📷 Camera</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick="grItemPhoto(${i},'gal')">🖼 Gallery</button>
+      ${it.photo?`<button type="button" class="btn btn-sm btn-ghost" onclick="grItemPhotoClear(${i})">✕ Remove photo</button>`:''}
+      <span class="helpText">Photo of this item (optional)</span></div></div>`).join('')
+    +`<datalist id="grPurityList"><option value="100"><option value="99.9"><option value="92.5"><option value="91.6"><option value="22K"><option value="18K"><option value="80"><option value="75"><option value="58.3"></datalist>`;
+  grRecalc();
+}
+function grAddItem(){ grItemsDraft.push(grNewItem()); renderGrItemRows(); const el=document.getElementById('gri-name-'+(grItemsDraft.length-1)); if(el) el.focus(); }
+function grRemoveItem(i){ if(grItemsDraft.length<=1){ grItemsDraft=[grNewItem()]; } else grItemsDraft.splice(i,1); renderGrItemRows(); }
+function grItemSet(i,f,v){
+  const it=grItemsDraft[i]; if(!it) return;
+  if(f==='weight' || f==='loanAmount') it[f]=(v===''?'':(parseFloat(v)||0));
+  else if(f==='purityText'){ it.purityText=v; const p=parsePurityInput(v); it.purity=p.pct; it.karat=p.karat; }
+  else it[f]=v;
+  grRecalc();
+}
+function grItemPhoto(i,src){ grItemPhotoTarget=i; document.getElementById(src==='cam'?'grItemCam':'grItemGal').click(); }
+function grItemPhotoChosen(e){
+  const file=(e.target.files||[])[0]; e.target.value=''; if(!file) return;
+  const i=grItemPhotoTarget;
+  compressImageFile(file, 480, 0.65, dataUrl=>{ if(grItemsDraft[i]){ grItemsDraft[i].photo=dataUrl; renderGrItemRows(); } });
+}
+function grItemPhotoClear(i){ if(grItemsDraft[i]){ grItemsDraft[i].photo=null; renderGrItemRows(); } }
+function grTotalTyped(){ grAutoTotal=false; grRecalc(); }
+function grRecalc(){
+  const items=grItemsDraft; if(!document.getElementById('grItemsWrap')) return;
+  const w=items.reduce((a,i)=>a+(Number(i.weight)||0),0), amt=items.reduce((a,i)=>a+(Number(i.loanAmount)||0),0);
+  const used=items.filter(i=>(i.name||'').trim()||Number(i.weight)>0||Number(i.loanAmount)>0||(i.notes||'').trim()||i.photo).length;
+  const sum=document.getElementById('grItemsSummary');
+  if(sum) sum.innerHTML=`<b>${used}</b> item${used===1?'':'s'} • total weight <b>${fmtWt(w)}</b>${amt>0?` • item amounts add up to <b>${fmtMoney(amt)}</b>`:''}`;
+  const tot=grTotalId?document.getElementById(grTotalId):null;
+  if(tot && grAutoTotal && amt>0) tot.value=amt;
+  const warns=[];
+  items.forEach((it,i)=>{ const n=(it.name||'').trim(), w0=Number(it.weight)||0, a0=Number(it.loanAmount)||0;
+    if(n||w0||a0||(it.notes||'').trim()||it.photo){ if(!n) warns.push(`Item ${i+1}: name / design is missing`); if(!(w0>0)) warns.push(`Item ${i+1}: weight is missing`); } });
+  const compare = tot ? (Number(tot.value)||0) : (grTotalFixed||0);
+  if(amt>0 && compare>0 && Math.abs(compare-amt)>0.5) warns.push(tot?`Total loan ${fmtMoney(compare)} is different from the item amounts (${fmtMoney(amt)}) — fine if you gave one lump sum.`:`Item amounts add up to ${fmtMoney(amt)} but the loan given was ${fmtMoney(compare)}. The loan total is changed only through the girvi transactions.`);
+  const wEl=document.getElementById('grItemWarn');
+  if(wEl) wEl.innerHTML=warns.length?`<div class="approveBox" style="margin-top:8px;">⚠️ ${warns.join('<br>⚠️ ')}</div>`:'';
+}
+function grReadItems(strict){
+  const out=[]; let error='';
+  grItemsDraft.forEach((it,i)=>{
+    const name=(it.name||'').trim(), w=Number(it.weight)||0, amt=Number(it.loanAmount)||0, notes=(it.notes||'').trim();
+    if(!name && !w && !amt && !notes && !it.photo) return;                         // an empty row is simply ignored
+    if(strict && (!name || w<=0) && !error) error=`Item ${i+1}: please enter ${!name?'the item name / design':'the weight'} — or remove this item`;
+    out.push({id:it.id, name, category:it.category||'Silver', weight:w, purity:(Number(it.purity)||100), karat:it.karat||null, loanAmount:amt, notes, photo:it.photo||null});
+  });
+  return {items:out, error};
+}
+function girviItemsHistoryText(g){ const n=girviItemCount(g); return n>1?`${n} items (${g.itemDesc})`:(g.itemDesc||''); }
+/* ---- bag colour is optional: choose it any time ---- */
+function openGirviBagPicker(id){
+  const g=DB.girvi.find(x=>x.id===id); if(!g) return;
+  openModal('🎒 Vault bag — '+g.customerName, `<p class="helpText" style="margin-top:0;">Choose the bag colour when you know it. It is optional — leave it as “Not selected” if you prefer.</p>${bagPickerHTML('gb', g.bagColor||'')}`, [
+    {label:'Cancel', cls:'btn-ghost', onClick:closeModal},
+    {label:'Save', cls:'btn-primary', onClick:()=>{
+      const v=readBag('gb'); if(v) rememberBag(v);
+      const old=g.bagColor||''; g.bagColor=v;
+      logHistory('Girvi','Bag colour', `${g.customerName}: bag ${old||'Not selected'} → ${v||'Not selected'}`);
+      saveDB(); closeModal(); toast(v?('Bag: '+v):'Bag cleared'); refreshGirviContext();
+    }}
+  ]);
+  bagHint('gb', g.id);
+}
+/* ---- the three forms ---- */
 function openGirviForm(prefillCustId){
   if(typeof prefillCustId!=='string') prefillCustId=null;
-  grPhotoData = null;
-  grDraftPhotos = [];
+  grPhotoData = null; grDraftPhotos = [];
   const dc = prefillCustId ? customerById(prefillCustId) : null;
   grCust = {mode:(dc&&dc.photo)?'prev':'none', cid:dc?dc.id:null, prevExists:!!(dc&&dc.photo)};
+  grItemsDraft=[grNewItem()]; grAutoTotal=true; grTotalId='grLoanAmt'; grTotalFixed=null;
   const body = `
     <div class="grid grid-2">
       <div class="field"><label>${T('customer')} *</label><input id="grCustomer" placeholder="Type name or phone — existing customers are suggested" value="${dc?escH(dc.name):''}"></div>
       <div class="field"><label>${T('phone')}</label><input id="grPhone" value="${dc?escH(dc.phone||''):''}"></div>
     </div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Village / Locality</label><div style="display:flex;gap:6px;"><input id="grVillage" list="grVillageList" placeholder="e.g. Sarwan" value="${escH(dc&&dc.village?dc.village:'')}"><button type="button" class="btn btn-sm btn-outline" style="white-space:nowrap;" onclick="grVillageCheck()">🏘 Check</button></div>
-        <datalist id="grVillageList">${knownVillages().map(v=>`<option value="${escH(v.name)}">`).join('')}</datalist></div>
-      ${bagPickerHTML('gr', DB.meta.lastBagColor||'')}
-    </div>
+    <div style="margin-top:12px;max-width:340px;">${bagPickerHTML('gr','')}</div>
     <div class="field" style="margin-top:12px;"><label>Customer Photo</label><div id="grCustPhotoBlock"></div>${grCustInputsHTML()}</div>
     <div class="approveBox" style="margin-top:12px;background:var(--gold-pale);border-color:var(--gold-light);">
-      📋 In a hurry? Tap <b>Save as Draft</b> below to save just the name/photos now — you can fill in the item, weight, and loan amount later when you have time.
+      📋 In a hurry? Tap <b>Save as Draft</b> below to save just the name/photos now — you can add the items and loan amount later when you have time.
     </div>
     <div style="margin-top:16px;border-top:1px dashed var(--gold-light);padding-top:12px;">
       <p class="helpText" style="margin-top:0;">Full girvi details (can be filled now, or later if saved as draft)</p>
-      <div class="grid grid-3">
-        <div class="field"><label>Item Description *</label><input id="grItem" placeholder="Silver Chain 45g"></div>
-        <div class="field"><label>${T('metal')}</label><select id="grMetal"><option>Silver</option><option>Gold</option></select></div>
-        <div class="field"><label>${T('purity')} %</label><input type="number" id="grPurity" value="100"></div>
-      </div>
-      <div class="grid grid-3" style="margin-top:12px;">
-        <div class="field"><label>${T('weight')} *</label><input type="number" step="0.001" id="grWeight"></div>
-        <div class="field"><label>Loan Amount *</label><input type="number" id="grLoanAmt"></div>
+      ${girviItemsEditorHTML()}
+      <div class="grid grid-2" style="margin-top:12px;">
+        <div class="field"><label>Total Loan Amount *</label><input type="number" id="grLoanAmt" oninput="grTotalTyped()"><div class="helpText">Adds up from the item amounts automatically — or just type the total.</div></div>
         <div class="field"><label>Interest %/month</label><input type="number" id="grInterest" value="2"></div>
       </div>
       <div class="grid grid-2" style="margin-top:12px;">
@@ -3092,89 +3431,155 @@ function openGirviForm(prefillCustId){
     {label:T('save'), cls:'btn-primary', onClick:()=>saveGirvi(false)}
   ]);
   attachCustomerAutocomplete('grCustomer','grPhone',{cid: dc?dc.id:'', onSelect:grOnCustSelect, onUnlink:grOnCustUnlink});
-  renderGrCustPhoto(); renderGrPhotoStrip(); bagHint('gr');
+  renderGrCustPhoto(); renderGrPhotoStrip(); renderGrItemRows(); bagHint('gr');
 }
 function saveGirvi(isDraft){
   const name = document.getElementById('grCustomer').value.trim();
   if(!name){ toast('Enter customer name'); return; }
   if(!customerGate('grCustomer','grPhone',()=>saveGirvi(isDraft))) return;
-  const itemDesc = document.getElementById('grItem').value.trim();
-  const weight = parseFloat(document.getElementById('grWeight').value)||0;
+  const R = grReadItems(!isDraft);
+  if(R.error){ toast(R.error); return; }
   const loanAmount = parseFloat(document.getElementById('grLoanAmt').value)||0;
   const gDate = document.getElementById('grDate').value || todayStr();
   if(!isDraft){
     const missing = [];
-    if(!itemDesc) missing.push('Item Description');
-    if(weight<=0) missing.push('Weight');
-    if(loanAmount<=0) missing.push('Loan Amount');
+    if(!R.items.length) missing.push('at least one item (name + weight)');
+    if(loanAmount<=0) missing.push('Total Loan Amount');
     if(missing.length){ toast('Please fill: '+missing.join(', ')+' — or use "Save as Draft" if details are not ready yet'); return; }
   }
   const cust = resolveCustomer('grCustomer','grPhone');
-  const village=(document.getElementById('grVillage').value||'').trim();
-  if(village && !cust.village) cust.village=village;
   const bag=readBag('gr'); if(bag) rememberBag(bag);
+  const agg=girviAggregate(R.items);
   const g = {
     id: uid('GIR'), date: gDate, createdAt: nowISO(),
-    customerId:cust.id, customerName:cust.name, itemDesc,
-    metal: document.getElementById('grMetal').value, purity: parseFloat(document.getElementById('grPurity').value)||100,
-    weight,
+    customerId:cust.id, customerName:cust.name, itemDesc:agg.itemDesc,
+    metal: R.items.length?agg.metal:'Silver', purity: R.items.length?agg.purity:100, weight: agg.weight, items: R.items,
     loanAmount, interestRatePct: parseFloat(document.getElementById('grInterest').value)||0,
     dueDate: document.getElementById('grDue').value||'', status: isDraft?'draft':'active', photo: null,
     outstandingPrincipal: loanAmount, lastInterestDate: gDate, isDraft: !!isDraft,
     referenceName: document.getElementById('grRefName').value||'', forwards: [], notes:'', bagColor:bag, photos:[], photoLog:[],
-    transactions: (isDraft && loanAmount<=0) ? [] : [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan'}]
+    transactions: (isDraft && loanAmount<=0) ? [] : [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan'+(R.items.length>1?' ('+R.items.length+' items)':'')}]
   };
   grApplyCustPhoto(cust, g);
   applyGirviPhotos(g, grDraftPhotos);
   DB.girvi.push(g);
-  logHistory('Girvi', isDraft?'Draft Created':'Created', isDraft ? `Draft girvi started for ${cust.name} (details pending)` : `Loan of ${fmtMoney(g.loanAmount)} against ${g.itemDesc} for ${cust.name}${bag?' — '+bag+' bag':''}`);
-  saveDB(); closeModal(); toast(isDraft?'Saved as draft — complete it later from the Girvi list':'Girvi loan saved'+(bag?' — '+bag+' bag':'')); refreshGirviContext();
+  logHistory('Girvi', isDraft?'Draft Created':'Created', isDraft ? `Draft girvi started for ${cust.name} (details pending)` : `Loan of ${fmtMoney(g.loanAmount)} against ${girviItemsHistoryText(g)} for ${cust.name}${bag?' — '+bag+' bag':''}`);
+  saveDB(); closeModal(); toast(isDraft?'Saved as draft — complete it later from the Girvi list':'Girvi loan saved'+(R.items.length>1?' — '+R.items.length+' items':'')+(bag?' — '+bag+' bag':'')); refreshGirviContext();
 }
 function openGirviCompleteForm(id){
   const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  grItemsDraft=grItemsToDraft(g); grAutoTotal=!(Number(g.loanAmount)>0); grTotalId='gcLoanAmt'; grTotalFixed=null;
   const body = `
     <p class="helpText" style="margin-top:0;">Fill in the remaining details to activate this girvi entry.</p>
-    <div class="grid grid-3">
-      <div class="field"><label>Item Description *</label><input id="gcItem" value="${escH(g.itemDesc||'')}" placeholder="Silver Chain 45g"></div>
-      <div class="field"><label>${T('metal')}</label><select id="gcMetal"><option ${g.metal==='Silver'?'selected':''}>Silver</option><option ${g.metal==='Gold'?'selected':''}>Gold</option></select></div>
-      <div class="field"><label>${T('purity')} %</label><input type="number" id="gcPurity" value="${g.purity||100}"></div>
-    </div>
-    <div class="grid grid-3" style="margin-top:12px;">
-      <div class="field"><label>${T('weight')} *</label><input type="number" step="0.001" id="gcWeight" value="${g.weight||''}"></div>
-      <div class="field"><label>Loan Amount *</label><input type="number" id="gcLoanAmt" value="${g.loanAmount||''}"></div>
+    ${girviItemsEditorHTML()}
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Total Loan Amount *</label><input type="number" id="gcLoanAmt" value="${g.loanAmount||''}" oninput="grTotalTyped()"></div>
       <div class="field"><label>Interest %/month</label><input type="number" id="gcInterest" value="${g.interestRatePct||2}"></div>
     </div>
     <div class="grid grid-2" style="margin-top:12px;">
       <div class="field"><label>Loan Date</label><input type="date" id="gcDate" value="${g.date}" max="${todayStr()}"></div>
       <div class="field"><label>Due Date (optional)</label><input type="date" id="gcDue" value="${g.dueDate||''}"></div>
     </div>
-    <div style="margin-top:12px;">${bagPickerHTML('gc', g.bagColor||DB.meta.lastBagColor||'')}</div>
+    <div style="margin-top:12px;max-width:340px;">${bagPickerHTML('gc', g.bagColor||'')}</div>
   `;
   openModal('Complete Girvi Entry — '+g.customerName, body, [
     {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
     {label:'Activate', cls:'btn-primary', onClick:()=>{
-      const itemDesc = document.getElementById('gcItem').value.trim();
-      const weight = parseFloat(document.getElementById('gcWeight').value)||0;
+      const R=grReadItems(true); if(R.error){ toast(R.error); return; }
       const loanAmount = parseFloat(document.getElementById('gcLoanAmt').value)||0;
       const missing = [];
-      if(!itemDesc) missing.push('Item Description');
-      if(weight<=0) missing.push('Weight');
-      if(loanAmount<=0) missing.push('Loan Amount');
+      if(!R.items.length) missing.push('at least one item (name + weight)');
+      if(loanAmount<=0) missing.push('Total Loan Amount');
       if(missing.length){ toast('Please fill: '+missing.join(', ')); return; }
       const gDate = document.getElementById('gcDate').value || g.date;
       const bag=readBag('gc'); if(bag) rememberBag(bag);
-      g.itemDesc = itemDesc; g.metal = document.getElementById('gcMetal').value;
-      g.purity = parseFloat(document.getElementById('gcPurity').value)||100; g.weight = weight; g.bagColor = bag;
+      const agg=girviAggregate(R.items);
+      g.items=R.items; g.itemDesc=agg.itemDesc; g.metal=agg.metal; g.purity=agg.purity; g.weight=agg.weight; g.bagColor=bag;
       g.loanAmount = loanAmount; g.interestRatePct = parseFloat(document.getElementById('gcInterest').value)||0;
       g.date = gDate; g.dueDate = document.getElementById('gcDue').value||''; g.lastInterestDate = gDate;
       g.outstandingPrincipal = loanAmount; g.status='active'; g.isDraft=false;
-      g.transactions = [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan (activated from draft)'}];
-      logHistory('Girvi','Activated', `Draft girvi for ${g.customerName} activated — loan ${fmtMoney(loanAmount)}${bag?' — '+bag+' bag':''}`);
+      g.transactions = [{id:uid('GTX'), date:gDate, type:'Loan Given', amount:loanAmount, note:'Initial girvi loan (activated from draft)'+(R.items.length>1?' ('+R.items.length+' items)':'')}];
+      logHistory('Girvi','Activated', `Draft girvi for ${g.customerName} activated — loan ${fmtMoney(loanAmount)} against ${girviItemsHistoryText(g)}${bag?' — '+bag+' bag':''}`);
       saveDB(); closeModal(); toast('Girvi activated'); refreshGirviContext();
     }}
   ]);
-  bagHint('gc', g.id);
+  renderGrItemRows(); bagHint('gc', g.id);
 }
+let egPhotoData = null;
+function openGirviEditForm(id){
+  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
+  const cust = customerById(g.customerId);
+  grDraftPhotos = (g.photos||[]).map(p=>Object.assign({},p));
+  grCust = g.photo ? {mode:'keep', data:g.photo, keepData:g.photo, cid:g.customerId, prevExists:!!(cust&&cust.photo)} : {mode:'none', cid:g.customerId, prevExists:!!(cust&&cust.photo)};
+  grItemsDraft=grItemsToDraft(g); grAutoTotal=false; grTotalId=null; grTotalFixed=Number(g.loanAmount)||0;
+  const body = `
+    <div class="field" style="margin-bottom:12px;"><label>Customer Photo</label><div id="grCustPhotoBlock"></div>${grCustInputsHTML()}</div>
+    <div class="field"><label>Customer Name</label><input id="egCustName" value="${escH(g.customerName)}"></div>
+    ${girviItemsEditorHTML()}
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Interest %/month</label><input type="number" id="egInterest" value="${g.interestRatePct}"></div>
+      <div class="field"><label>Loan given</label><input value="${fmtMoney(g.loanAmount)}" disabled style="background:var(--bg);color:var(--ink-soft);"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Loan Date</label><input type="date" id="egDate" value="${g.date}" max="${todayStr()}"></div>
+      <div class="field"><label>Due Date</label><input type="date" id="egDue" value="${g.dueDate||''}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Reference</label><input id="egRefName" value="${escH(g.referenceName||'')}"></div>
+      ${bagPickerHTML('eg', g.bagColor)}
+    </div>
+    ${girviPhotoPickerHTML()}
+    <div class="field" style="margin-top:12px;"><label>Description / Note</label><textarea id="egNotes" rows="3" placeholder="Any important detail worth remembering about this loan">${escH(g.notes||'')}</textarea></div>
+    <p class="helpText" style="margin-top:10px;">To change the loan amount itself, delete the wrong transaction in the ledger and add a correct one — this keeps the ledger accurate.</p>
+  `;
+  openModal('Edit Girvi Details — '+g.customerName, body, [
+    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
+    {label:'Save Changes', cls:'btn-primary', onClick:()=>{
+      const R=grReadItems(!g.isDraft); if(R.error){ toast(R.error); return; }
+      const changes = [];
+      const newName = document.getElementById('egCustName').value.trim();
+      if(newName && newName!==g.customerName){
+        const c0 = DB.customers.find(x=>x.id===g.customerId);
+        if(c0){ changes.push(`name: "${c0.name}" → "${newName}"`); c0.name = newName; }
+        g.customerName = newName;
+      }
+      const agg=girviAggregate(R.items);
+      if(JSON.stringify((girviItems(g)).map(i=>[i.name,i.category,i.weight,i.purity,i.loanAmount,i.notes,!!i.photo]))!==JSON.stringify(R.items.map(i=>[i.name,i.category,i.weight,i.purity,i.loanAmount,i.notes,!!i.photo]))) changes.push('items updated ('+R.items.length+')');
+      g.items=R.items; g.itemDesc=agg.itemDesc; g.weight=agg.weight;
+      if(R.items.length){ g.metal=agg.metal; g.purity=agg.purity; }
+      g.interestRatePct = parseFloat(document.getElementById('egInterest').value)||0;
+      g.date = document.getElementById('egDate').value || g.date;
+      g.dueDate = document.getElementById('egDue').value || '';
+      g.referenceName = document.getElementById('egRefName').value||'';
+      const bag=readBag('eg'); if(bag) rememberBag(bag); if((g.bagColor||'')!==bag) changes.push('bag colour: '+(bag||'Not selected')); g.bagColor=bag;
+      const newNotes = document.getElementById('egNotes').value||'';
+      if(newNotes!==g.notes) changes.push('note updated');
+      g.notes = newNotes;
+      const oldPhoto=g.photo;
+      const c1 = customerById(g.customerId);
+      if(c1) grApplyCustPhoto(c1, g); else if(grCust.mode==='none') g.photo=null; else if(grCust.mode==='new') g.photo=grCust.data;
+      if(g.photo!==oldPhoto) changes.push(oldPhoto?(g.photo?'photo replaced':'photo removed'):'photo added');
+      applyGirviPhotos(g, grDraftPhotos);
+      if(g.transactions && g.transactions[0] && g.transactions[0].type==='Loan Given') g.transactions[0].date = g.date;
+      logHistory('Girvi','Edited', `Loan details updated for ${g.customerName} (${girviItemsHistoryText(g)})${changes.length?' — '+changes.join(', '):''}`);
+      saveDB(); closeModal(); toast('Girvi details updated'); refreshGirviContext();
+    }}
+  ]);
+  renderGrCustPhoto(); renderGrPhotoStrip(); renderGrItemRows(); bagHint('eg', g.id);
+}
+/* ---- confirmation shown once when the multi-store / village-directory options are removed ---- */
+function showFeatureRemovalNotice(){
+  if(DB.meta.multiStoreVillageRemoved) return;
+  if(document.getElementById('modalWrap').classList.contains('active')){ setTimeout(showFeatureRemovalNotice, 4000); return; }
+  const n=(DB.refDirectory||[]).length;
+  if(n===0 && (!DB.meta.storeName || DB.meta.storeName==='Main Store')){ DB.meta.multiStoreVillageRemoved=nowISO(); saveDB(); return; }
+  openModal('Multi-store & Village Directory removed', `<p style="margin-top:0;">These options were removed to keep the app simple and single-store.</p>
+    <p><b>Nothing was deleted.</b> ${n?`The ${n} imported directory entr${n===1?'y':'ies'} `:'Any related settings '}stay${n===1?'s':''} hidden inside your data and are included in every backup.</p>
+    <p class="helpText">Village is still part of each customer's name (Name, Father, Caste, Village) and you can search it in any search box.</p>`, [
+    {label:'OK, understood', cls:'btn-primary', onClick:()=>{ DB.meta.multiStoreVillageRemoved=nowISO(); logHistory('Settings','Feature removed','Multi-store and village directory options removed — data kept hidden, not deleted'); saveDB(); closeModal(); }}
+  ]);
+}
+
 function girviStatusBanner(g){
   if(g.deleted) return `<div class="approveBox" style="background:var(--warn-bg);border-color:var(--gold);margin-top:0;">🗑 <b>This loan was deleted (archived).</b> It is kept here for the customer's history and is not counted anywhere.</div>`;
   if(g.status==='redeemed') return `<div class="approveBox" style="background:var(--success-bg);margin-top:0;">✅ <b>Closed — redeemed</b>${g.redeemedDate?' on '+fmtDate(g.redeemedDate):''}. Not counted in active loans; kept in the customer ledger.</div>`;
@@ -3192,10 +3597,10 @@ function viewGirvi(id){
     <div class="girviDetailHead">
       ${headPhoto?`<img src="${headPhoto}" class="photoThumb" style="width:64px;height:64px;cursor:pointer;" onclick="openFullPhoto(this.src,'${escH(g.customerName).replace(/'/g,'&#39;')}')">`:`<div class="photoPlaceholder" style="width:64px;height:64px;">📷</div>`}
       <div>
-        <div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${escH(g.customerName)}</div>
-        <div class="helpText">${escH(g.itemDesc)} — ${fmtWt(g.weight)}, ${g.purity||100}% ${g.metal}</div>
+        <div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${escH(g.customerName)}${phoneAfterHTML(g.customerId)}</div>
+        <div class="helpText">${girviSummaryLine(g)}</div>
         <div class="helpText">Loan date: ${fmtDate(g.date)} • ${days} din is shop mein</div>
-        <div style="margin-top:6px;">${g.bagColor?bagChipHTML(g.bagColor,{big:true}):'<span class="helpText">🎒 No bag colour set</span>'}</div>
+        <div style="margin-top:6px;">${g.bagColor?bagChipHTML(g.bagColor,{big:true}):'<span class="helpText">🎒 Bag: Not selected</span>'} ${(g.deleted||g.status==='redeemed'||g.status==='forfeited')?'':`<button class="btn btn-sm btn-outline" style="padding:3px 9px;" onclick="openGirviBagPicker('${g.id}')">${g.bagColor?'Change bag':'＋ Select bag'}</button>`}</div>
       </div>
     </div>
     <div class="grid grid-2" style="margin-bottom:10px;">
@@ -3204,9 +3609,10 @@ function viewGirvi(id){
       <div><b>Status:</b> ${girviStatusTag(g)}</div>
       <div><b>Due Date:</b> ${g.dueDate?fmtDate(g.dueDate):'-'}</div>
     </div>
+    ${girviItemsTableHTML(g)}
     ${g.status==='draft'&&!g.deleted?`<div class="approveBox" style="background:var(--gold-pale);border-color:var(--gold-light);">📋 This is a draft entry — only the customer and photo were saved so far. Tap <b>Complete Entry</b> below to fill in the item, weight, and loan amount.</div>`:''}
     ${g.referenceName?`<div class="helpText" style="margin-bottom:10px;">🤝 <b>Referred by:</b> ${escH(g.referenceName)}</div>`:''}
-    ${galleryHTML((g.photos||[]).map(p=>({data:p.data,label:photoLabel(p)})),'Item photos')}${girviPhotoHistoryHTML(g)}
+    ${galleryHTML((g.photos||[]).map(p=>({data:p.data,label:photoLabel(p)})),'Photos')}${girviPhotoHistoryHTML(g)}
     ${live?`<div class="approveBox">Estimated interest due since last entry: <b>${fmtMoney(girviInterestDue(g))}</b></div>`:''}
     ${live?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
       <button class="btn btn-sm btn-ghost" onclick="closeModal();openGirviTxForm('${g.id}','Interest Received')">+ Interest Received</button>
@@ -3265,79 +3671,6 @@ function saveGirviPhotoManager(){
   if(removed.length) askOwnerApproval('Removing '+removed.length+' photo(s) needs the manager PIN.', apply); else apply();
 }
 /* ---- edit form ---- */
-let egPhotoData = null;
-function openGirviEditForm(id){
-  const g = DB.girvi.find(x=>x.id===id); if(!g) return;
-  const cust = customerById(g.customerId);
-  grDraftPhotos = (g.photos||[]).map(p=>Object.assign({},p));
-  grCust = g.photo ? {mode:'keep', data:g.photo, keepData:g.photo, cid:g.customerId, prevExists:!!(cust&&cust.photo)} : {mode:'none', cid:g.customerId, prevExists:!!(cust&&cust.photo)};
-  const body = `
-    <div class="field" style="margin-bottom:12px;"><label>Customer Photo</label><div id="grCustPhotoBlock"></div>${grCustInputsHTML()}</div>
-    <div class="field"><label>Customer Name</label><input id="egCustName" value="${escH(g.customerName)}"></div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Item Description${g.isDraft?'':' *'}</label><input id="egItem" value="${escH(g.itemDesc)}"></div>
-      <div class="field"><label>${T('metal')}</label><select id="egMetal"><option ${g.metal==='Silver'?'selected':''}>Silver</option><option ${g.metal==='Gold'?'selected':''}>Gold</option></select></div>
-    </div>
-    <div class="grid grid-3" style="margin-top:12px;">
-      <div class="field"><label>${T('weight')}${g.isDraft?'':' *'}</label><input type="number" step="0.001" id="egWeight" value="${g.weight}"></div>
-      <div class="field"><label>${T('purity')} %</label><input type="number" id="egPurity" value="${g.purity||100}"></div>
-      <div class="field"><label>Interest %/month</label><input type="number" id="egInterest" value="${g.interestRatePct}"></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Loan Date</label><input type="date" id="egDate" value="${g.date}" max="${todayStr()}"></div>
-      <div class="field"><label>Due Date</label><input type="date" id="egDue" value="${g.dueDate||''}"></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Reference</label><input id="egRefName" value="${escH(g.referenceName||'')}"></div>
-      ${bagPickerHTML('eg', g.bagColor)}
-    </div>
-    ${girviPhotoPickerHTML()}
-    <div class="field" style="margin-top:12px;"><label>Description / Note</label><textarea id="egNotes" rows="3" placeholder="Any important detail worth remembering about this loan">${escH(g.notes||'')}</textarea></div>
-    <p class="helpText" style="margin-top:10px;">To change the loan amount itself, delete the wrong transaction in the ledger and add a correct one — this keeps the ledger accurate.</p>
-  `;
-  openModal('Edit Girvi Details — '+g.customerName, body, [
-    {label:T('cancel'), cls:'btn-ghost', onClick:closeModal},
-    {label:'Save Changes', cls:'btn-primary', onClick:()=>{
-      const newItem = document.getElementById('egItem').value.trim();
-      const newWeight = parseFloat(document.getElementById('egWeight').value)||0;
-      if(!g.isDraft){
-        const missing = [];
-        if(!newItem) missing.push('Item Description');
-        if(newWeight<=0) missing.push('Weight');
-        if(missing.length){ toast('Please fill: '+missing.join(', ')); return; }
-      }
-      const changes = [];
-      const newName = document.getElementById('egCustName').value.trim();
-      if(newName && newName!==g.customerName){
-        const c0 = DB.customers.find(x=>x.id===g.customerId);
-        if(c0){ changes.push(`name: "${c0.name}" → "${newName}"`); c0.name = newName; }
-        g.customerName = newName;
-      }
-      if(newItem!==g.itemDesc) changes.push('item description updated');
-      g.itemDesc = newItem;
-      g.metal = document.getElementById('egMetal').value;
-      g.weight = newWeight;
-      g.purity = parseFloat(document.getElementById('egPurity').value)||100;
-      g.interestRatePct = parseFloat(document.getElementById('egInterest').value)||0;
-      g.date = document.getElementById('egDate').value || g.date;
-      g.dueDate = document.getElementById('egDue').value || '';
-      g.referenceName = document.getElementById('egRefName').value||'';
-      const bag=readBag('eg'); if(bag) rememberBag(bag); if((g.bagColor||'')!==bag) changes.push('bag colour: '+(bag||'none')); g.bagColor=bag;
-      const newNotes = document.getElementById('egNotes').value||'';
-      if(newNotes!==g.notes) changes.push('note updated');
-      g.notes = newNotes;
-      const oldPhoto=g.photo;
-      const c1 = customerById(g.customerId);
-      if(c1) grApplyCustPhoto(c1, g); else if(grCust.mode==='none') g.photo=null; else if(grCust.mode==='new') g.photo=grCust.data;
-      if(g.photo!==oldPhoto) changes.push(oldPhoto?(g.photo?'photo replaced':'photo removed'):'photo added');
-      applyGirviPhotos(g, grDraftPhotos);
-      if(g.transactions && g.transactions[0] && g.transactions[0].type==='Loan Given') g.transactions[0].date = g.date;
-      logHistory('Girvi','Edited', `Loan details updated for ${g.customerName} (${g.itemDesc})${changes.length?' — '+changes.join(', '):''}`);
-      saveDB(); closeModal(); toast('Girvi details updated'); refreshGirviContext();
-    }}
-  ]);
-  renderGrCustPhoto(); renderGrPhotoStrip(); bagHint('eg', g.id);
-}
 function handleGirviEditPhoto(e){ grCustPhotoChosen(e,'camera'); }
 function handleGirviPhoto(e){ grCustPhotoChosen(e,'camera'); }
 /* ---- closure screen: the bag colour is the first thing you see ---- */
@@ -3346,8 +3679,8 @@ function redeemGirvi(id){
   const bal = g.outstandingPrincipal!==undefined ? g.outstandingPrincipal : g.loanAmount;
   const cust = customerById(g.customerId); const hp=g.photo||(cust&&customerMainPhoto(cust));
   const body = `${closureBagBanner(g)}
-    <div class="girviDetailHead">${hp?`<img src="${hp}" class="photoThumb" style="width:60px;height:60px;">`:`<div class="photoPlaceholder" style="width:60px;height:60px;">👤</div>`}<div><div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${escH(g.customerName)}</div>
-      <div class="helpText">${escH(g.itemDesc)} — ${fmtWt(g.weight)}, ${g.purity||100}% ${g.metal}</div><div class="helpText">Pledged ${fmtDate(g.date)} • ${daysBetween(g.date)} days ago</div></div></div>
+    <div class="girviDetailHead">${hp?`<img src="${hp}" class="photoThumb" style="width:60px;height:60px;">`:`<div class="photoPlaceholder" style="width:60px;height:60px;">👤</div>`}<div><div style="font-family:var(--font-display);font-size:18px;color:var(--maroon-dark);">${escH(g.customerName)}${phoneAfterHTML(g.customerId)}</div>
+      <div class="helpText">${girviSummaryLine(g)}</div><div class="helpText">Pledged ${fmtDate(g.date)} • ${daysBetween(g.date)} days ago</div></div></div>
     <div class="grid grid-2" style="margin:12px 0;"><div><b>Outstanding principal:</b> ${fmtMoney(bal)}</div><div><b>Interest due (est.):</b> ${fmtMoney(girviInterestDue(g))}</div></div>
     ${galleryHTML((g.photos||[]).map(p=>({data:p.data,label:photoLabel(p)})),'Item photos (to identify the piece)')}
     <p class="helpText">Closing marks this loan as redeemed. It leaves the active Girvi list and all totals, and stays in ${escH(g.customerName)}'s ledger and History.</p>`;
@@ -4573,12 +4906,12 @@ function renderLedger(){
   const villages=knownVillages(true);
   const dupN = liveCustomers().length<=1500 ? findDuplicatePairs().length : 0;
   let html = `<div class="cardHead" style="margin-bottom:14px;"><div></div><div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-outline" onclick="openVillageLookup('')">🏘 Village Check</button>
+    
     <button class="btn btn-outline" onclick="openDuplicatesReview()">🔎 Find Duplicates${dupN?' ('+dupN+')':''}</button>
     <button class="btn btn-outline" onclick="openMergeStart()">🔀 Merge Customers</button>
     <button class="btn btn-primary" onclick="openNewCustomerForm()">+ New Customer</button></div></div>`;
   html += `<div class="card"><div class="filterBar">
-    <div class="field" style="flex:2;min-width:220px;"><label>Search</label><input id="ledgerSearch" placeholder="Name, phone (partial is fine), village…" oninput="renderLedgerList()"></div>
+    <div class="field" style="flex:2;min-width:220px;"><label>Search</label><input id="ledgerSearch" placeholder="Name, phone, village, loan item, bill no, note…" oninput="renderLedgerList()"></div>
     <div class="field"><label>Village</label><select id="lgVillage" onchange="renderLedgerList()"><option value="">All villages</option>${villages.map(v=>`<option value="${escH(v.name)}">${escH(v.name)} (${v.count})</option>`).join('')}</select></div>
     <div class="field"><label>Show</label><select id="lgHas" onchange="renderLedgerList()"><option value="">All customers</option><option value="due">Has credit due</option><option value="girvi">Has active girvi</option><option value="closed">Has closed girvi</option><option value="sales">Has sales</option><option value="buying">Has purchases</option><option value="credit">Has credit entries</option><option value="jobs">Has jobs</option><option value="nophoto">No photo yet</option><option value="novillage">No village saved</option></select></div>
     <div class="field"><label>Last visit from</label><input type="date" id="lgFrom" onchange="renderLedgerList()"></div>
@@ -4593,9 +4926,9 @@ function renderLedgerList(){
   const q=(document.getElementById('ledgerSearch')?.value||'').trim();
   const village=document.getElementById('lgVillage')?.value||'', has=document.getElementById('lgHas')?.value||'';
   const from=document.getElementById('lgFrom')?.value||'', to=document.getElementById('lgTo')?.value||'', sort=document.getElementById('lgSort')?.value||'name';
-  const idx=buildCustIndex();
+  const idx=buildCustIndex(); const extra=q?ledgerExtraTexts():null;
   let rows=liveCustomers().map(c=>({c, k:custIdx(idx,c.id), bal:customerBalance(c.id)})).filter(({c,k,bal})=>{
-    if(!customerMatchesQuery(c,q)) return false;
+    if(!ledgerMatch(c,q,extra)) return false;
     if(village && normName(c.village)!==normName(village)) return false;
     if(has==='due' && !(bal>0)) return false;
     if(has==='girvi' && !k.girviActive) return false;
@@ -4641,7 +4974,7 @@ function customerTimeline(id){
   });
   DB.girvi.filter(g=>g.customerId===id).forEach(g=>{
     const st=girviStatusLabel(g);
-    out.push({type:'girvi', date:g.date, ts:g.createdAt||'', icon:'🔐', label:'Girvi', title:g.status==='draft'?'Girvi draft (details pending)':'Girvi — '+(g.itemDesc||''), detailHTML:(g.bagColor?bagChipHTML(g.bagColor)+' ':'')+(g.status!=='draft'?escH(fmtWt(g.weight)):''), amount:g.status==='draft'?null:g.loanAmount, deleted:!!g.deleted, tag:st.t, tagCls:st.cls, open:`viewGirvi('${g.id}')`});
+    out.push({type:'girvi', date:g.date, ts:g.createdAt||'', icon:'🔐', label:'Girvi', title:g.status==='draft'?'Girvi draft (details pending)':'Girvi — '+(g.itemDesc||''), detailHTML:girviItemsLineHTML(g)+(g.bagColor?bagChipHTML(g.bagColor)+' ':'')+(g.status!=='draft'?escH(fmtWt(g.weight)):''), amount:g.status==='draft'?null:g.loanAmount, deleted:!!g.deleted, tag:st.t, tagCls:st.cls, open:`viewGirvi('${g.id}')`});
     (g.transactions||[]).filter(t=>t.type!=='Loan Given').forEach(t=>out.push({type:'girvi', date:t.date, ts:(t.date||'')+'T12:00', icon:'↳', label:'Girvi', title:t.type+' — '+(g.itemDesc||''), detail:t.note||'', amount:t.amount, deleted:!!(g.deleted||t.deleted), open:`viewGirvi('${g.id}')`}));
   });
   DB.buying.filter(b=>b.customerId===id).forEach(b=>out.push({type:'buy', date:b.date, ts:b.createdAt||'', icon:'⚖️', label:'Purchase', title:'Purchase — '+(b.itemDesc||b.metal||''), detail:fmtWt(b.weight)+' '+(b.metal||''), amount:b.amount, deleted:!!b.deleted, open:`printBuyingReceipt('${b.id}')`}));
@@ -4657,6 +4990,7 @@ function customerPhotoGallery(cid){
   DB.girvi.filter(g=>g.customerId===cid && !g.deleted).forEach(g=>{
     add(g.photo,'Customer photo at girvi ('+fmtDate(g.date)+')');
     (g.photos||[]).forEach(p=>add(p.data,'Girvi — '+(g.itemDesc||'item photo')+' ('+fmtDate(g.date)+')'));
+    girviItems(g).forEach(it=>{ if(it.photo) add(it.photo,'Girvi item — '+(it.name||'item')+' ('+fmtDate(g.date)+')'); });
   });
   return out;
 }
@@ -4693,14 +5027,14 @@ function renderCustomerProfilePage(){
     <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline" onclick="openCustomerProfileForm('${id}')">✎ Edit Profile</button>
     <button class="btn btn-outline" onclick="openCreditForm('${escH(c.name).replace(/'/g,'&#39;')}','${id}')">+ Credit Entry</button>
     <button class="btn btn-outline" onclick="openGirviForm('${id}')">🔐 New Girvi</button>
-    <button class="btn btn-ghost" onclick="openVillageLookup('${escH(c.village||'').replace(/'/g,'&#39;')}')">🏘 Village Check</button>
     <button class="btn btn-ghost" onclick="openMergePicker('${id}')">🔀 Merge Duplicate</button></div></div>`;
   html+=`<div class="card"><div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;">
     <div style="cursor:zoom-in;" onclick="${gallery.length?'window._photoViewerList=customerPhotoGallery(window._profileId).map(p=>({data:p.data,label:p.label}));openPhotoViewer(0)':''}">${custAvatarHTML(c,96)}</div>
     <div style="flex:1;min-width:240px;"><div style="font-family:var(--font-display);font-size:26px;color:var(--maroon-dark);">${escH(c.name)} ${c.tags?'<span class="tag tag-gold">'+escH(c.tags)+'</span>':''}${isFrequent?' <span class="tag tag-green">Frequent</span>':''}${c.creditEnabled?' <span class="tag tag-gray">Credit A/C</span>':''}</div>
       ${(c.aliases||[]).length?`<div class="helpText">Also known as: ${escH(c.aliases.join(', '))}</div>`:''}
       <div style="margin-top:6px;">📞 ${phones.length?phones.map(p=>escH(p)).join(' • '):'<span class="helpText">No phone on file</span>'}</div>
-      <div style="margin-top:4px;">🏘 ${c.village?`<b>${escH(c.village)}</b>`:'<span class="helpText">No village saved — add it in Edit Profile</span>'}${c.address?' • '+escH(c.address):''}</div>
+      ${(c.father||c.caste)?`<div style="margin-top:4px;">👨 Father: <b>${escH(c.father||'—')}</b>${c.caste?' • Caste: <b>'+escH(c.caste)+'</b>':''}</div>`:''}
+      <div style="margin-top:4px;">🏘 ${c.village?`<b>${escH(c.village)}</b>`:'<span class="helpText">No village — write the name as Name, Father, Caste, Village</span>'}${c.address?' • '+escH(c.address):''}</div>
       ${c.referredBy?`<div class="helpText" style="margin-top:6px;">🤝 Referred by: ${refBy?`<a class="cpLink" onclick="viewCustomerLedger('${refBy.id}')">${escH(refBy.name)}</a>`:escH(c.referredBy)}</div>`:''}
       ${c.familyLink?`<div class="helpText">👪 Family / relation: ${escH(c.familyLink)}</div>`:''}
       <div class="helpText" style="margin-top:6px;">Customer since ${first?fmtDate(first):(c.createdAt?fmtDate(c.createdAt.slice(0,10)):'—')} • Last visit ${last?fmtDate(last):'—'}</div></div></div></div>`;
@@ -4717,10 +5051,10 @@ function renderCustomerProfilePage(){
       <div class="field"><label>To</label><input type="date" id="pfTo" onchange="pfSet('to',this.value)"></div>
       <div class="field" style="flex:0 0 auto;"><label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="pfDel" checked style="width:auto;" onchange="pfSet('showDeleted',this.checked)"> Show deleted</label></div></div>
     <div id="pfChips" class="chipRow"></div><div id="pfTimeline"></div></div>`;
-  html+=`<div class="pfGrid"><div class="card"><div class="cardHead"><h3>🔐 Girvi — all loans</h3></div>${girviAll.length?`<table><tr><th>Date</th><th>Item</th><th>Bag</th><th>Loan</th><th>Status</th><th></th></tr>${girviAll.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(g=>{ const st=girviStatusLabel(g); return `<tr class="${g.deleted?'rowDeleted':''}"><td>${fmtDate(g.date)}</td><td>${escH(g.itemDesc||'')}</td><td>${g.bagColor?bagChipHTML(g.bagColor):'—'}</td><td class="amt">${g.status==='draft'?'—':fmtMoney(g.loanAmount)}</td><td><span class="tag ${st.cls}">${st.t}</span></td><td><button class="btn btn-sm btn-ghost" onclick="viewGirvi('${g.id}')">View</button></td></tr>`; }).join('')}</table>`:'<div class="empty">No girvi yet.</div>'}</div>
+  html+=`<div class="pfGrid"><div class="card"><div class="cardHead"><h3>🔐 Girvi — all loans</h3></div>${girviAll.length?`<table><tr><th>Date</th><th>Item</th><th>Bag</th><th>Loan</th><th>Status</th><th></th></tr>${girviAll.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(g=>{ const st=girviStatusLabel(g); return `<tr class="${g.deleted?'rowDeleted':''}"><td>${fmtDate(g.date)}</td><td>${girviItemCellHTML(g,0)}</td><td>${g.bagColor?bagChipHTML(g.bagColor):'<span class="helpText">Not selected</span>'}</td><td class="amt">${g.status==='draft'?'—':fmtMoney(g.loanAmount)}</td><td><span class="tag ${st.cls}">${st.t}</span></td><td><button class="btn btn-sm btn-ghost" onclick="viewGirvi('${g.id}')">View</button></td></tr>`; }).join('')}</table>`:'<div class="empty">No girvi yet.</div>'}</div>
     <div class="card"><div class="cardHead"><h3>📷 Photos (${gallery.length})</h3></div>${gallery.length?galleryHTML(gallery,''):'<div class="empty">No photos yet — add them while creating a girvi.</div>'}</div></div>`;
   html+=`<div class="pfGrid"><div class="card"><div class="cardHead"><h3>🏘 Village &amp; references</h3></div>
-      ${c.village?`<div>Village: <b>${escH(c.village)}</b> — ${sameVillage.length} other customer(s) from here ${sameVillage.length?`<a class="cpLink" onclick="openVillageLookup('${escH(c.village).replace(/'/g,'&#39;')}')">see them</a>`:''}</div>`:'<div class="helpText">No village saved for this customer.</div>'}
+      ${c.village?`<div>Village: <b>${escH(c.village)}</b> — ${sameVillage.length} other customer(s) from here </div>`:'<div class="helpText">No village saved for this customer.</div>'}
       ${refBy?`<div style="margin-top:6px;">Referred by <a class="cpLink" onclick="viewCustomerLedger('${refBy.id}')">${escH(refBy.name)}</a>${refBy.village?' ('+escH(refBy.village)+')':''}</div>`:(c.referredBy?`<div style="margin-top:6px;">Referred by ${escH(c.referredBy)}</div>`:'')}
       ${referred.length?`<div style="margin-top:6px;">Brought these customers: ${referred.map(o=>`<a class="cpLink" onclick="viewCustomerLedger('${o.id}')">${escH(o.name)}</a>`).join(', ')}</div>`:''}
       ${DB.girvi.filter(g=>g.customerId===id&&g.referenceName).slice(0,3).map(g=>`<div class="helpText" style="margin-top:6px;">Girvi reference given: ${escH(g.referenceName)}</div>`).join('')}</div>
@@ -4811,14 +5145,11 @@ function openCustomerProfileForm(id){
       <div class="helpText">Replacing the photo keeps the old one in the customer's photo history.</div>
     </div>
     <div class="grid grid-2">
-      <div class="field"><label>Name</label><input id="cpName" value="${escH(c.name)}"></div>
+      <div class="field"><label>Name, Father, Caste, Village</label><input id="cpName" value="${escH(c.name)}" placeholder="e.g. Ajay, Ramesh, Ninama, Sarwan"><div class="helpText">The village is the 4th part of the name.</div></div>
       <div class="field"><label>${T('phone')}</label><input id="cpPhone" value="${escH(c.phone||'')}"></div>
     </div>
     <div class="field" style="margin-top:12px;"><label>Other phone numbers <span class="helpText">(comma separated)</span></label><input id="cpAltPhones" value="${escH((c.altPhones||[]).join(', '))}" placeholder="e.g. 98xxxxxx01, 70xxxxxx22"></div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Village / Locality</label><input id="cpVillage" list="cpVillageList" value="${escH(c.village||'')}" placeholder="e.g. Sarwan"><datalist id="cpVillageList">${knownVillages(true).map(v=>`<option value="${escH(v.name)}">`).join('')}</datalist></div>
-      <div class="field"><label>Tag</label><input id="cpTags" value="${escH(c.tags||'')}" placeholder="e.g. VIP, Frequent"></div>
-    </div>
+    <div class="field" style="margin-top:12px;"><label>Tag</label><input id="cpTags" value="${escH(c.tags||'')}" placeholder="e.g. VIP, Frequent">${(!parseNameParts(c.name).hasSep && c.village)?`<div class="helpText">Village on file: <b>${escH(c.village)}</b> — kept as it is until you write the name as Name, Father, Caste, Village.</div>`:''}</div>
     <div class="grid grid-2" style="margin-top:12px;">
       <div class="field"><label>Referred By</label><input id="cpReferredBy" value="${escH(c.referredBy||'')}" placeholder="Who introduced them"></div>
       <div class="field"><label>Family / Relation Link</label><input id="cpFamilyLink" value="${escH(c.familyLink||'')}" placeholder="e.g. Ramesh's son-in-law"></div>
@@ -4834,7 +5165,8 @@ function openCustomerProfileForm(id){
     {label:'Save Changes', cls:'btn-primary', onClick:()=>{
       const name = document.getElementById('cpName').value.trim();
       if(!name){ toast('Name is required'); return; }
-      c.name=name; c.phone=document.getElementById('cpPhone').value; c.village=document.getElementById('cpVillage').value;
+      const oldName=c.name; c.name=fmtCustName(name); c.phone=document.getElementById('cpPhone').value; applyNameParts(c);
+      if(c.name!==oldName){ ['sales','buying','girvi','jobs','exchange'].forEach(k=>(DB[k]||[]).forEach(r=>{ if(r.customerId===c.id) r.customerName=c.name; })); }
       c.altPhones=(document.getElementById('cpAltPhones').value||'').split(',').map(x=>x.trim()).filter(Boolean);
       c.tags=document.getElementById('cpTags').value; c.referredBy=document.getElementById('cpReferredBy').value;
       c.familyLink=document.getElementById('cpFamilyLink').value; c.notes=document.getElementById('cpNotes').value;
@@ -4992,8 +5324,13 @@ function renderReports(){
 
   { const _bc=bagCounts();
     html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Girvi — Active Items by Bag</h3>
-      <table>${_bc.list.length?_bc.list.map(b=>`<tr><td>${bagChipHTML(b.name)}</td><td>${b.count} item(s)</td></tr>`).join(''):'<tr><td colspan="2" class="helpText">No bag colours recorded yet.</td></tr>'}${_bc.none?`<tr><td class="helpText">No bag set</td><td>${_bc.none} item(s)</td></tr>`:''}</table>
+      <table>${_bc.list.length?_bc.list.map(b=>`<tr><td>${bagChipHTML(b.name)}</td><td>${b.count} item(s)</td></tr>`).join(''):'<tr><td colspan="2" class="helpText">No bag colours recorded yet.</td></tr>'}${_bc.none?`<tr><td class="helpText">Not selected</td><td>${_bc.none} item(s)</td></tr>`:''}</table>
       <p class="helpText" style="margin-top:8px;">Closed loans are not counted — they stay in each customer's ledger.</p></div>`; }
+  { const held={}; let multiN=0;
+    DB.girvi.filter(g=>!g.deleted && g.status==='active').forEach(g=>{ const its=girviItems(g); if(its.length>1) multiN++; its.forEach(i=>{ const k=i.category||'Other'; held[k]=held[k]||{n:0,w:0}; held[k].n++; held[k].w+=Number(i.weight)||0; }); });
+    html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Girvi — Items Held (Active Loans)</h3>
+      <table>${Object.keys(held).length?Object.entries(held).map(([k,v])=>`<tr><td>${escH(k)}</td><td>${v.n} item(s)</td><td>${fmtWt(v.w)}</td></tr>`).join(''):'<tr><td colspan="3" class="helpText">No active loans.</td></tr>'}</table>
+      <p class="helpText" style="margin-top:8px;">${multiN} multi-item loan(s) among the active loans.</p></div>`; }
   html += `<div class="card"><h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Expenses (30 Days)</h3>
     <table>${DB.expenses.filter(e=>e.date>=monthAgo && !e.deleted).map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.category}</td><td>${fmtMoney(e.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="helpText">No expenses logged.</td></tr>'}</table></div>`;
 
@@ -5769,15 +6106,6 @@ function renderSettings(){
       <p class="helpText" style="margin-top:0;">Used for udhaar entries that have no due date. Entries with a due date become overdue the day after it.</p>
     </div>
     <div class="card">
-      <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Multi-store &amp; Village Directory</h3>
-      <p class="helpText" style="margin-top:0;">Opening a second store? Export this store's customer directory, import it on the other tablet, and the <b>Village Check</b> there will also search it — handy to verify an unknown customer.</p>
-      <div class="field" style="margin-bottom:10px;max-width:320px;"><label>This store's name</label><input id="setStoreName" value="${escH(DB.meta.storeName||'Main Store')}" onchange="saveStoreName(this.value)"></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><button class="btn btn-outline" onclick="exportCustomerDirectory()">⬆ Export customer directory</button>
-        <label class="helpText" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="dirPhotos" style="width:auto;"> include small photos (bigger file)</label>
-        <button class="btn btn-outline" onclick="document.getElementById('dirImportInput').click()">⬇ Import directory</button><input type="file" id="dirImportInput" accept="application/json,.json" style="display:none" onchange="importCustomerDirectory(event)"></div>
-      <div style="margin-top:12px;">${directoryListHTML()}</div>
-    </div>
-    <div class="card">
       <h3 style="font-family:var(--font-display);color:var(--maroon-dark);margin-top:0;">Language</h3>
       <div style="display:flex;gap:10px;">
         <button class="btn ${DB.meta.language==='en'?'btn-primary':'btn-ghost'}" onclick="setLanguage('en')">English</button>
@@ -5805,7 +6133,8 @@ function renderStorageHealth(){
   <div class="helpText">Snapshot last taken: ${DB.meta.recordCountSnapshotAt?new Date(DB.meta.recordCountSnapshotAt).toLocaleString('en-IN'):'Not yet'} — used to warn you if record counts ever look smaller than last time (a sign you may have opened a different copy of the app).</div>
   <div id="storageQuotaOut" class="helpText" style="margin-top:4px;"></div>
   <button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="freeUpSpace()">🗜 Free Up Space (shrink stored photos)</button>`;
-  wrap.innerHTML = html;
+  html += storageSafetyHTML();
+  wrap.innerHTML = html; renderSnapshotList(); requestPersistentStorage();
   if(navigator.storage && navigator.storage.estimate){
     navigator.storage.estimate().then(function(est){
       const out = document.getElementById('storageQuotaOut'); if(!out) return;
@@ -5935,6 +6264,7 @@ document.getElementById('restoreFileInput').addEventListener('change', function(
       confirmAction('Restoring will replace ALL current data on this tablet with the backup file. Continue?', async ()=>{
         toast('Restoring…');
         try{
+          try{ await idbKeyPut(SNAP_PREFIX+'before-restore', {at:nowISO(), label:'Copy of your data made just before a restore', counts:countsOf(DB), data:JSON.parse(JSON.stringify(DB))}); }catch(e4){}
           await idbSet(data);
           DB = data;
           toast('Restore complete — reloading…');
@@ -5980,6 +6310,7 @@ function handlePinKey(k){
   }
 }
 function unlockApp(){
+  if(_storageLocked && _storageLockReason==='read-failed'){ toast('Your saved data could not be read — please reload first'); return; }
   document.getElementById('lockScreen').style.display='none';
   document.getElementById('shell').classList.add('active');
   pinBuffer='';
@@ -6078,6 +6409,7 @@ function init(){
   updateClock();
   if(!window._clockInterval) window._clockInterval = setInterval(updateClock, 30000);
   startBackupScheduler();
+  setTimeout(showFeatureRemovalNotice, 1200);
 }
 document.getElementById('lockHint').textContent = 'Loading your shop data…';
 document.getElementById('padGrid').style.opacity = '0.35';
@@ -6086,9 +6418,12 @@ window._bootPromise = (async function boot(){
   try{
     DB = await loadDB();
   }catch(e){
+    lockStorage('read-failed');
     DB = migrateDB(defaultDB());
   }
   document.getElementById('lockTitle').textContent = DB.meta.shopName;
+  requestPersistentStorage();
+  setTimeout(()=>{ ensureDailySnapshot().catch(()=>{}); }, 3000);
   document.getElementById('lockHint').textContent = 'Default PIN: 1234 — change it from Settings after login';
   document.getElementById('padGrid').style.opacity = '1';
   document.getElementById('padGrid').style.pointerEvents = 'auto';
